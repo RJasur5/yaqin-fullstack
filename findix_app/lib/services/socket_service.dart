@@ -1,0 +1,235 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../config/api_config.dart';
+import '../config/localization.dart';
+import 'notification_service.dart';
+import 'package:flutter/material.dart';
+import '../main.dart';
+import '../widgets/order_notification_overlay.dart';
+import '../models/master.dart';
+
+class SocketService {
+  static final SocketService _instance = SocketService._internal();
+  factory SocketService() => _instance;
+  SocketService._internal();
+
+  WebSocketChannel? _channel;
+  bool _isConnected = false;
+  int? _connectedUserId;
+  Timer? _pingTimer;
+  final _messageController = StreamController<dynamic>.broadcast();
+
+  Stream<dynamic> get messageStream => _messageController.stream;
+  bool get isConnected => _isConnected;
+  int? get connectedUserId => _connectedUserId;
+  MasterModel? _currentMasterProfile;
+
+  void setMasterProfile(MasterModel? profile) async {
+    _currentMasterProfile = profile;
+    debugPrint('SOCKET_SERVICE: Master profile set: ${profile?.subcategoryNameRu}');
+    
+    // Persist for background isolates
+    final prefs = await SharedPreferences.getInstance();
+    if (profile != null) {
+      await prefs.setString('yaqin_master_profile', jsonEncode(profile.toJson()));
+    } else {
+      await prefs.remove('yaqin_master_profile');
+    }
+  }
+
+  void connect(int userId) {
+    if (_isConnected && _connectedUserId != userId) {
+      disconnect();
+    }
+    
+    if (_isConnected) return;
+
+    _connectedUserId = userId;
+    _currentMasterProfile = null; // Important: Clear profile for new user
+    final wsUrl = ApiConfig.wsNotifications(userId);
+    print('Connecting to WebSocket: $wsUrl');
+
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _isConnected = true;
+
+      _channel!.stream.listen(
+        (message) {
+          if (message == 'pong') {
+            debugPrint('SOCKET_SERVICE: Received pong');
+            return;
+          }
+          _handleMessage(message);
+        },
+        onDone: () {
+          debugPrint('SOCKET_SERVICE: Connection closed for user $userId');
+          _stopPing();
+          _isConnected = false;
+          // Simple backoff or immediate reconnect for background reliability
+          Future.delayed(const Duration(seconds: 3), () {
+             if (_connectedUserId == userId) connect(userId);
+          });
+        },
+        onError: (error) {
+          debugPrint('SOCKET_SERVICE: Connection error: $error');
+          _stopPing();
+          _isConnected = false;
+          Future.delayed(const Duration(seconds: 5), () {
+             if (_connectedUserId == userId) connect(userId);
+          });
+        },
+      );
+
+      _startPing();
+    } catch (e) {
+      print('WebSocket connection failed: $e');
+      _isConnected = false;
+    }
+  }
+
+  Future<void> _handleMessage(dynamic message) async {
+    debugPrint('SOCKET_SERVICE: Received message: $message');
+    try {
+      final data = jsonDecode(message);
+      
+      // Load profile if missing (helps in background isolates)
+      if (_currentMasterProfile == null) {
+        final prefs = await SharedPreferences.getInstance();
+        final profileStr = prefs.getString('yaqin_master_profile');
+        if (profileStr != null) {
+          _currentMasterProfile = MasterModel.fromJson(jsonDecode(profileStr));
+        }
+      }
+
+      if (data['type'] == 'new_order') {
+        _messageController.add(data); // BROADCAST TO UI
+        
+        // Show notification (System or Overlay)
+        final nav = YaqinApp.navigatorKey.currentState;
+        if (nav != null) {
+          _showGlobalOverlay(data);
+        } else {
+          // BACKGROUND: Show system notification
+          await NotificationService.instance.showNotification(
+            id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+            title: '⚡ Новый заказ!',
+            body: '${data['subcategory_name_ru']}: ${data['description']}',
+            payload: 'available_orders',
+          );
+        }
+      } else if (data['type'] == 'order_accepted') {
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: '🤝 Yaqin',
+          body: AppStrings.isRu 
+            ? 'Мастер ${data['master_name']} принял ваш заказ: ${data['subcategory_name_ru']}'
+            : 'Usta ${data['master_name']} buyurtmangizni qabul qildi: ${data['subcategory_name_uz']}',
+          payload: 'my_orders',
+        );
+      } else if (data['type'] == 'order_completed') {
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: '✅ Yaqin',
+          body: AppStrings.orderCompleted,
+          payload: 'my_orders',
+        );
+      } else if (data['type'] == 'chat_message') {
+        _messageController.add(data); // BROADCAST TO UI
+        // Show notification for incoming chat messages
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: '💬 Сообщение от ${data['sender_name'] ?? 'пользователя'}',
+          body: data['text'] ?? '',
+          payload: 'chat_${data['order_id']}',
+        );
+      }
+    } catch (e) {
+      debugPrint('SOCKET_SERVICE: Error parsing message: $e');
+    }
+  }
+
+  void _showGlobalOverlay(dynamic order) {
+    final nav = YaqinApp.navigatorKey.currentState;
+    if (nav == null) return;
+    
+    OverlayState? overlayState = nav.overlay;
+    if (overlayState == null) return;
+
+    final theme = Theme.of(nav.context);
+    late OverlayEntry overlayEntry;
+
+    overlayEntry = OverlayEntry(
+      builder: (context) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: Stack(
+          children: [
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.light ? Colors.white : const Color(0xFF1E1E1E),
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(24),
+                      bottomRight: Radius.circular(24),
+                    ),
+                    border: Border.all(color: theme.primaryColor.withOpacity(0.2), width: 1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: OrderNotificationOverlay(
+                    order: order,
+                    onTap: () {
+                      overlayEntry.remove();
+                      nav.pushNamed('/available-orders');
+                    },
+                    onClose: () => overlayEntry.remove(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    overlayState.insert(overlayEntry);
+  }
+
+  void _startPing() {
+    _stopPing();
+    _pingTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (_isConnected && _channel != null) {
+        try {
+          _channel!.sink.add('ping');
+          debugPrint('SOCKET_SERVICE: Sent ping');
+        } catch (e) {
+          debugPrint('SOCKET_SERVICE: Ping failed: $e');
+        }
+      }
+    });
+  }
+
+  void _stopPing() {
+    _pingTimer?.cancel();
+    _pingTimer = null;
+  }
+
+  void disconnect() {
+    _stopPing();
+    _channel?.sink.close();
+    _isConnected = false;
+    _connectedUserId = null;
+  }
+}

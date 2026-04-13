@@ -1,0 +1,31 @@
+workflows:
+  ios-build:
+    name: Yaqin iOS Unsigned Build
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      groups:
+        - common
+      flutter: master
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd findix_app
+          flutter pub get
+      - name: Build iOS (Unsigned)
+        script: |
+          cd findix_app
+          flutter build ios --release --no-codesign
+      - name: Create installable artifact (app bundle)
+        script: |
+          cd findix_app/build/ios/iphoneos
+          mkdir -p Payload
+          mv Runner.app Payload/
+          zip -r Yaqin.ipa Payload
+    artifacts:
+      - findix_app/build/ios/iphoneos/*.ipa
+    publishing:
+      email:
+        recipients:
+          - jasur@example.com # Replace with your email if you want notifications

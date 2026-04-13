@@ -1,0 +1,35 @@
+# Flutter related
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.dart_tool/
+**/.pub-cache/
+**/.packages
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/android/local.properties
+**/android/findix_app_android.iml
+**/.idea/
+**/*.iml
+
+# Python / Backend
+backend/venv/
+**/__pycache__/
+*.py[cod]
+*$py.class
+backend/.env
+backend/*.log
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log
+lt.log
+ngrok.log
+
+# OS related
+.DS_Store
+Thumbs.db
