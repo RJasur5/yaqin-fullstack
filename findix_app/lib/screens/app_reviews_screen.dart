@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../config/localization.dart';
 import '../config/api_config.dart';
+import '../utils/date_utils.dart';
 import '../services/api_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/glass_container.dart';
@@ -290,8 +291,8 @@ class _AppReviewsScreenState extends State<AppReviewsScreen> {
   String _formatDate(String? isoString) {
     if (isoString == null) return "";
     try {
-      final date = DateTime.parse(isoString);
-      return "${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}";
+      final date = DateTimeUtils.parseUtc(isoString);
+      return DateTimeUtils.formatDate(date);
     } catch (_) {
       return "";
     }

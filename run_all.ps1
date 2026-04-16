@@ -18,7 +18,11 @@ if ($ip) {
     $configPath = Join-Path $PSScriptRoot "findix_app\lib\config\api_config.dart"
     if (Test-Path $configPath) {
         $content = Get-Content $configPath -Raw
-        $newContent = $content -replace "static const String baseUrl = '.*';", "static const String baseUrl = 'http://$($ip):8005';"
+        $newContent = $content -replace "static const String devUrl = 'http://.*:8005';", "static const String devUrl = 'http://$($ip):8005';"
+        if ($newContent -eq $content) {
+            # Try matching any port if 8005 wasn't there
+            $newContent = $content -replace "static const String devUrl = 'http://.*';", "static const String devUrl = 'http://$($ip):8005';"
+        }
         $newContent | Set-Content $configPath
         Write-Host "Updated api_config.dart with current IP." -ForegroundColor Green
     } else {

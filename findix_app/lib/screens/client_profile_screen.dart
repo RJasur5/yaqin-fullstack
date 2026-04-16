@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import '../config/theme.dart';
 import '../config/api_config.dart';
 import '../services/api_service.dart';
-import '../widgets/full_screen_image.dart';
+import '../../widgets/full_screen_image.dart';
+import '../../utils/date_utils.dart';
 import 'package:intl/intl.dart';
 
 class ClientProfileScreen extends StatefulWidget {
@@ -78,8 +79,8 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         ? (avatar.toString().startsWith('http') ? avatar : '${ApiConfig.baseUrl}$avatar')
         : null;
 
-    final createdAt = DateTime.tryParse(_client!['created_at'] ?? '') ?? DateTime.now();
-    final joinDate = DateFormat('MMMM yyyy', 'ru').format(createdAt);
+    final createdAt = DateTimeUtils.parseUtc(_client!['created_at']);
+    final joinDate = DateTimeUtils.formatMonthYear(createdAt, 'ru');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 100, 20, 20),
@@ -236,7 +237,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
                   Text('⭐ ${r['rating']}', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.orange)),
                   const Spacer(),
                   Text(
-                    DateFormat('dd.MM.yyyy').format(DateTime.parse(r['created_at'])),
+                    DateTimeUtils.formatDate(DateTimeUtils.parseUtc(r['created_at'])),
                     style: TextStyle(fontSize: 12, color: theme.hintColor),
                   ),
                 ],

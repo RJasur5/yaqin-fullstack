@@ -147,11 +147,6 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
       }
 
       print('DEBUG: Sending to API - District: $_selectedDistrict, Subcategory: $_selectedSubcategoryId');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Запрос отправлен. Район: ${_selectedDistrict ?? "Не указан"}')),
-        );
-      }
 
       String? addressToSend = _addressController.text.trim();
       if (_selectedCity == 'Toshkent' && _selectedDistrict != null) {
@@ -191,9 +186,6 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
         // Refresh local user state so isMaster becomes true immediately
         await widget.authService.refreshUser();
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Профиль успешно сохранен!'), backgroundColor: Colors.green),
-        );
         Navigator.pop(context, true);
       }
     } catch (e) {
@@ -377,22 +369,8 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                           ),
                         ),
                       ),
-                    ] else ...[
-                      TextField(
-                        controller: _addressController,
-                        style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                        decoration: InputDecoration(
-                          labelText: AppStrings.isRu ? 'Адрес' : 'Manzil',
-                          labelStyle: TextStyle(color: theme.textTheme.bodySmall?.color),
-                          hintText: AppStrings.isRu ? 'Улица, дом, кв...' : 'Ko\'cha, uy, xonadon...',
-                          hintStyle: TextStyle(color: theme.hintColor),
-                          filled: true,
-                          fillColor: theme.cardTheme.color,
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                          prefixIcon: Icon(Icons.map_rounded, color: theme.iconTheme.color),
-                        ),
-                      ),
                     ],
+
                     const SizedBox(height: 20),
 
                     // Experience

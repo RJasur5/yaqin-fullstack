@@ -7,6 +7,7 @@ import '../../widgets/full_screen_image.dart';
 import 'chat_screen.dart';
 import '../master_detail_screen.dart';
 import '../client_profile_screen.dart';
+import '../../utils/date_utils.dart';
 import 'package:intl/intl.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -229,13 +230,8 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessageBubble(dynamic msg, bool isMe, ThemeData theme) {
-    DateTime time;
-    try {
-      time = DateTime.parse(msg['created_at']).toLocal();
-    } catch (_) {
-      time = DateTime.now();
-    }
-    final timeStr = DateFormat('HH:mm').format(time);
+    final time = DateTimeUtils.parseUtc(msg['created_at']);
+    final timeStr = DateTimeUtils.formatTime(time);
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

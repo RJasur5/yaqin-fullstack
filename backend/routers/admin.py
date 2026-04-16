@@ -14,8 +14,25 @@ from routers.auth import get_current_admin
 from routers.orders import build_order_response
 from routers.masters import build_master_card
 from models import Order, MasterProfile, Review
+from websocket_manager import manager
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"])
+
+@router.get("/stats")
+def get_admin_stats(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Get system-wide statistics for the admin dashboard."""
+    total_users = db.query(User).count()
+    total_orders = db.query(Order).count()
+    online_users = manager.get_active_users_count()
+    
+    return {
+        "total_users": total_users,
+        "total_orders": total_orders,
+        "online_users": online_users
+    }
 
 # ==================== USERS ====================
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/theme.dart';
+import '../../utils/date_utils.dart';
 import '../../config/api_config.dart';
 import '../../services/api_service.dart';
 import 'chat_screen.dart';
@@ -61,7 +62,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   String _formatTime(String? timeStr) {
     if (timeStr == null) return '';
     try {
-      final date = DateTime.parse(timeStr).toLocal();
+      final date = DateTimeUtils.parseUtc(timeStr);
       final now = DateTime.now();
       if (date.day == now.day && date.month == now.month && date.year == now.year) {
         return DateFormat('HH:mm').format(date);

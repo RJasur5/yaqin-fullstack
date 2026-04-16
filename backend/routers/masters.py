@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session, joinedload
 from typing import Optional, List
+from datetime import timezone
 
 from database import get_db
 from models import User, MasterProfile, Subcategory, Category, Review
@@ -104,8 +105,13 @@ def get_master_detail(master_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Master not found")
 
     card = build_master_card(profile)
-    reviews = [
-        ReviewResponse(
+    reviews = []
+    for r in profile.reviews:
+        created_at = r.created_at
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+            
+        reviews.append(ReviewResponse(
             id=r.id,
             master_id=r.master_id,
             client_id=r.client_id,
@@ -113,10 +119,8 @@ def get_master_detail(master_id: int, db: Session = Depends(get_db)):
             client_avatar=r.client.avatar,
             rating=r.rating,
             comment=r.comment,
-            created_at=r.created_at,
-        )
-        for r in profile.reviews
-    ]
+            created_at=created_at,
+        ))
 
     return MasterDetailResponse(
         **card.dict(),
@@ -255,6 +259,10 @@ def create_review(
     db.commit()
     db.refresh(review)
 
+    created_at = review.created_at
+    if created_at and created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
     return ReviewResponse(
         id=review.id,
         master_id=review.master_id,
@@ -263,5 +271,5 @@ def create_review(
         client_avatar=user.avatar,
         rating=review.rating,
         comment=review.comment,
-        created_at=review.created_at,
+        created_at=created_at,
     )

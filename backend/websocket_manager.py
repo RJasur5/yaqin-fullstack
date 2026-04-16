@@ -33,4 +33,25 @@ class ConnectionManager:
         for user_id in master_user_ids:
             await self.send_personal_message(order_data, user_id)
 
+    def get_active_users_count(self) -> int:
+        # Filter out dead sockets in real-time
+        active_count = 0
+        to_remove_users = []
+        
+        for user_id, connections in self.active_connections.items():
+            # Check if at least one socket is actually connected (client_state 1 = CONNECTED)
+            # We use name check to be safe across different versions
+            still_alive = [c for c in connections if hasattr(c, 'client_state') and c.client_state.name == 'CONNECTED']
+            if still_alive:
+                active_count += 1
+                self.active_connections[user_id] = still_alive
+            else:
+                to_remove_users.append(user_id)
+        
+        for uid in to_remove_users:
+            if uid in self.active_connections:
+                del self.active_connections[uid]
+                
+        return active_count
+
 manager = ConnectionManager()

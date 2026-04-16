@@ -280,6 +280,16 @@ class AppTheme {
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: p.card,
+        contentTextStyle: GoogleFonts.nunito(color: p.textPrimary, fontWeight: FontWeight.w600),
+        behavior: SnackBarBehavior.floating,
+        elevation: 10,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: p.primary.withOpacity(0.3), width: 1),
+        ),
+      ),
     );
   }
 

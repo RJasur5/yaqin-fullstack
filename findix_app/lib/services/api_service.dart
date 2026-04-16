@@ -320,11 +320,13 @@ class ApiService {
   Future<List<dynamic>> getAvailableOrders({
     int? categoryId,
     int? subcategoryId,
+    String? city,
     String? search,
   }) async {
     final params = <String, String>{
       if (categoryId != null) 'category_id': '$categoryId',
       if (subcategoryId != null) 'subcategory_id': '$subcategoryId',
+      if (city != null && city.isNotEmpty) 'city': city,
       if (search != null && search.isNotEmpty) 'search': search,
     };
     final uri = Uri.parse(ApiConfig.ordersAvailable).replace(queryParameters: params);
@@ -334,6 +336,7 @@ class ApiService {
     }
     throw Exception('Failed to load available orders');
   }
+
 
   Future<List<dynamic>> getMyOrders({String? type}) async {
     final params = <String, String>{
@@ -571,5 +574,17 @@ class ApiService {
     if (res.statusCode != 200) {
       throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to change password');
     }
+  }
+
+  Future<Map<String, dynamic>> getAdminStats() async {
+    final res = await http.get(
+      Uri.parse(ApiConfig.adminStats),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception('Failed to load admin stats');
   }
 }

@@ -79,10 +79,11 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       setState(() => _error = AppStrings.isRu ? 'Опишите задачу' : 'Vazifani tavsiflang');
       return;
     }
-    if (_selectedDistrict == null) {
+    if (_selectedCity == 'Toshkent' && _selectedDistrict == null) {
       setState(() => _error = AppStrings.isRu ? 'Выберите район' : 'Tumanni tanlang');
       return;
     }
+
 
     setState(() {
       _isSaving = true;
@@ -100,9 +101,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         includeTaxi: _includeTaxi,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.isRu ? 'Объявление опубликовано!' : 'E\'lon joylashtirildi!')),
-        );
         Navigator.pop(context, true);
       }
     } catch (e) {

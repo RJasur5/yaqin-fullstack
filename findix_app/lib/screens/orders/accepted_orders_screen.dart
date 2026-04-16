@@ -6,6 +6,7 @@ import '../../services/api_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/gradient_button.dart';
 import '../../widgets/rating_stars.dart';
+import '../../utils/date_utils.dart';
 import 'chat_screen.dart';
 
 class AcceptedOrdersScreen extends StatefulWidget {
@@ -92,8 +93,8 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
     final theme = Theme.of(context);
     final subName = AppStrings.isRu ? order['subcategory_name_ru'] : order['subcategory_name_uz'];
     final status = order['status'];
-    final date = DateTime.parse(order['created_at']);
-    final formattedDate = DateFormat('dd.MM HH:mm').format(date);
+    final date = DateTimeUtils.parseUtc(order['created_at']);
+    final formattedDate = DateTimeUtils.formatFull(date);
     
     Color statusColor = Colors.orange;
     String statusText = AppStrings.isRu ? 'Открыто' : 'Ochiq';
@@ -265,9 +266,6 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
                     await widget.apiService.rateClient(order['id'], rating, commentController.text);
                     if (mounted) {
                       Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Спасибо за отзыв!'), backgroundColor: Colors.green),
-                      );
                       _loadOrders();
                     }
                   } catch (e) {

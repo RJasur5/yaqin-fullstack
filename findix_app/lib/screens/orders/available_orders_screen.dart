@@ -11,6 +11,7 @@ import '../client_profile_screen.dart';
 import '../../widgets/rating_stars.dart';
 import '../../config/api_config.dart';
 import '../../widgets/full_screen_image.dart';
+import '../../utils/date_utils.dart';
 
 class AvailableOrdersScreen extends StatefulWidget {
   final ApiService apiService;
@@ -30,7 +31,14 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
   int? _selectedCategoryId;
   int? _selectedSubcategoryId;
   String _searchQuery = '';
+  String? _selectedSearchCity;
+
+  final List<String> _uzbekistanCities = [
+    'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
+    'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
+  ];
   final _searchController = TextEditingController();
+
 
   @override
   void initState() {
@@ -45,8 +53,10 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
       final orders = await widget.apiService.getAvailableOrders(
         categoryId: _selectedCategoryId,
         subcategoryId: _selectedSubcategoryId,
+        city: _selectedSearchCity,
         search: _searchQuery.isNotEmpty ? _searchQuery : null,
       );
+
       if (mounted) {
         setState(() {
           _orders = orders;
@@ -67,19 +77,60 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
     try {
       await widget.apiService.acceptOrder(orderId);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(AppStrings.isRu ? 'Вы приняли заказ!' : 'Siz buyurtmani qabul qildingiz!')),
-        );
         _loadOrders();
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        final errorMsg = e.toString();
+        if (errorMsg.contains('already accepted')) {
+          _showAlreadyAcceptedDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(errorMsg)),
+          );
+        }
       }
     }
   }
+
+  void _showAlreadyAcceptedDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).cardTheme.color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            const SizedBox(width: 10),
+            Text(
+              AppStrings.isRu ? 'Вы не успели' : 'Ulgurmadingiz',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          AppStrings.isRu 
+            ? 'Этот заказ только что принял другой мастер. Не расстраивайтесь, скоро появятся новые заказы!' 
+            : 'Bu buyurtmani boshqa usta qabul qilib bo\'ldi. Xafa bo\'lmang, tez orada yangi buyurtmalar paydo bo\'ladi!',
+          style: const TextStyle(fontSize: 16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _loadOrders();
+            },
+            child: Text(
+              AppStrings.isRu ? 'Понятно' : 'Tushunarli',
+              style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -134,27 +185,35 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: TextField(
-            controller: _searchController,
-            style: theme.textTheme.bodyLarge,
-            onChanged: (v) {
-              setState(() => _searchQuery = v);
-              _loadOrders();
-            },
-            decoration: InputDecoration(
-              hintText: AppStrings.searchHint,
-              prefixIcon: Icon(Icons.search_rounded, color: theme.textTheme.bodySmall?.color),
-              suffixIcon: _searchQuery.isNotEmpty 
-                ? IconButton(
-                    icon: Icon(Icons.clear_rounded, color: theme.textTheme.bodySmall?.color),
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() => _searchQuery = '');
-                      _loadOrders();
-                    },
-                  )
-                : null,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: theme.textTheme.bodyLarge,
+                  onChanged: (v) {
+                    setState(() => _searchQuery = v);
+                    _loadOrders();
+                  },
+                  decoration: InputDecoration(
+                    hintText: AppStrings.searchHint,
+                    prefixIcon: Icon(Icons.search_rounded, color: theme.textTheme.bodySmall?.color),
+                    suffixIcon: _searchQuery.isNotEmpty 
+                      ? IconButton(
+                          icon: Icon(Icons.clear_rounded, color: theme.textTheme.bodySmall?.color),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                            _loadOrders();
+                          },
+                        )
+                      : null,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _buildCityPicker(),
+            ],
           ),
         ),
         if (widget.categories.isNotEmpty)
@@ -201,6 +260,92 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
       ],
     );
   }
+
+  Widget _buildCityPicker() {
+    final theme = Theme.of(context);
+    return PopupMenuButton<String?>(
+      initialValue: _selectedSearchCity,
+      tooltip: AppStrings.isRu ? 'Выбрать город' : 'Shaharni tanlash',
+      onSelected: (String? value) {
+        setState(() {
+          _selectedSearchCity = value;
+        });
+        _loadOrders();
+      },
+      child: Container(
+        height: 52,
+        width: 52,
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.tune_rounded, // filter/settings icon as requested
+              color: _selectedSearchCity == null ? theme.hintColor : theme.primaryColor,
+              size: 24,
+            ),
+            if (_selectedSearchCity != null)
+              Positioned(
+                right: 12,
+                top: 12,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: theme.primaryColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: theme.cardTheme.color ?? theme.scaffoldBackgroundColor, width: 2),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+
+      itemBuilder: (BuildContext context) {
+        return [
+          PopupMenuItem<String?>(
+            value: null,
+            child: Row(
+              children: [
+                Icon(Icons.all_inclusive, size: 18, color: theme.hintColor),
+                const SizedBox(width: 10),
+                Text(AppStrings.isRu ? 'Все города' : 'Barcha shaharlar'),
+              ],
+            ),
+          ),
+          ..._uzbekistanCities.map((String city) {
+            final isSelected = _selectedSearchCity == city;
+            return PopupMenuItem<String?>(
+              value: city,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.location_city_rounded, 
+                    size: 18, 
+                    color: isSelected ? theme.primaryColor : theme.primaryColor.withOpacity(0.4)
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    city,
+                    style: TextStyle(
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                      color: isSelected ? theme.primaryColor : theme.textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ];
+      },
+    );
+  }
+
 
   Widget _buildFilterChip({required String label, required bool selected, required Function(bool) onSelected}) {
     final theme = Theme.of(context);
@@ -312,8 +457,11 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
   Widget _buildOrderCard(dynamic order) {
     final theme = Theme.of(context);
     final subName = AppStrings.isRu ? order['subcategory_name_ru'] : order['subcategory_name_uz'];
-    final date = DateTime.parse(order['created_at']);
-    final formattedDate = DateFormat('dd.MM HH:mm').format(date);
+    final date = DateTimeUtils.parseUtc(order['created_at']);
+    final formattedDate = DateTimeUtils.formatFull(date);
+    
+    // Debug to console to verify the 5-hour shift
+    debugPrint('TIME DEBUG: Raw=${order['created_at']} | Local=${date.toString()}');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),

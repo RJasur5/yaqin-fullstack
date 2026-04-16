@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ==================== AUTH ====================
@@ -34,6 +34,13 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 class TokenResponse(BaseModel):
@@ -140,6 +147,13 @@ class ReviewResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
 
 class ClientReviewCreate(BaseModel):
     rating: int = Field(ge=1, le=5)  # 1-5
@@ -158,6 +172,13 @@ class ClientReviewResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 class ClientDetailResponse(UserResponse):
@@ -193,6 +214,13 @@ class ChatMessageResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
 
 class ChatSummaryResponse(BaseModel):
     order_id: int
@@ -206,6 +234,13 @@ class ChatSummaryResponse(BaseModel):
     subcategory_name_ru: str
     subcategory_name_uz: str
     unread_count: int = 0
+
+    @field_validator("last_message_time", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 
 # ==================== ORDER ====================
@@ -247,6 +282,13 @@ class OrderResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 # ==================== ADMIN ====================
 
@@ -294,5 +336,12 @@ class AppReviewResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
 
 MasterDetailResponse.update_forward_refs()

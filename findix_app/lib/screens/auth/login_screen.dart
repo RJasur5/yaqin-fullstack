@@ -186,26 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Privacy Policy link
-                Center(
-                  child: GestureDetector(
-                    onTap: () => _showPrivacyPolicy(context),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        AppStrings.isRu
-                          ? '🔒 Политика конфиденциальности'
-                          : '🔒 Maxfiylik siyosati',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Theme.of(context).primaryColor.withOpacity(0.7),
-                          fontSize: 13,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                const SizedBox(height: 16),
                 const SizedBox(height: 32),
               ],
             ),

@@ -52,6 +52,11 @@ async def complete_order_after_delay(order_id: int):
         db.close()
 
 def build_order_response(order: Order) -> OrderResponse:
+    # Ensure created_at is timezone-aware UTC
+    created_at = order.created_at
+    if created_at and created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+        
     return OrderResponse(
         id=order.id,
         client_id=order.client_id,
@@ -71,7 +76,7 @@ def build_order_response(order: Order) -> OrderResponse:
         district=order.district,
         price=order.price,
         status=order.status,
-        created_at=order.created_at,
+        created_at=created_at,
         is_client_reviewed=order.is_client_reviewed,
         is_master_reviewed=order.is_master_reviewed,
         include_lunch=order.include_lunch,
@@ -180,12 +185,12 @@ def create_order(
 def get_available_orders(
     category_id: Optional[int] = Query(None),
     subcategory_id: Optional[int] = Query(None),
+    city: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     authorization: str = Header(""),
     db: Session = Depends(get_db)
 ):
     user = get_current_user_from_header(authorization, db)
-    profile = db.query(MasterProfile).filter(MasterProfile.user_id == user.id).first()
     
     query = db.query(Order).options(
         joinedload(Order.client),
@@ -196,20 +201,18 @@ def get_available_orders(
         query = query.filter(Subcategory.category_id == category_id)
     if subcategory_id:
         query = query.filter(Order.subcategory_id == subcategory_id)
+    if city:
+        query = query.filter(Order.city.ilike(f"%{city}%"))
     if search:
         query = query.filter(
             (Order.description.ilike(f"%{search}%")) |
             (Subcategory.name_ru.ilike(f"%{search}%")) |
             (Subcategory.name_uz.ilike(f"%{search}%"))
         )
-
-    # Orders are now visible to everyone who is a usta, regardless of specialization.
-    # We only optionally filter by city to keep things locally relevant.
-    if profile and profile.city:
-        query = query.filter(Order.city.ilike(f"%{profile.city}%"))
             
     orders = query.order_by(Order.created_at.desc()).all()
     return [build_order_response(o) for o in orders]
+
 
 @router.post("/{order_id}/accept", response_model=OrderResponse)
 async def accept_order(
@@ -227,7 +230,8 @@ async def accept_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     if order.status != "open":
-        raise HTTPException(status_code=400, detail="Order is already accepted or closed")
+        raise HTTPException(status_code=400, detail="Order already accepted by another master")
+
         
     order.master_id = profile.id
     order.status = "accepted"
@@ -433,6 +437,10 @@ def get_chat_history(
         raise HTTPException(status_code=403, detail="У вас нет доступа к этому чату")
         
     messages = db.query(ChatMessage).filter(ChatMessage.order_id == order_id).order_by(ChatMessage.created_at.asc()).all()
+    # Ensure they are aware UTC
+    for m in messages:
+        if m.created_at and m.created_at.tzinfo is None:
+            m.created_at = m.created_at.replace(tzinfo=timezone.utc)
     print(f"DEBUG: Found {len(messages)} messages")
     return messages
 
@@ -484,6 +492,11 @@ async def get_chat_list(
             ChatMessage.is_read == False
         ).count()
         
+        # Ensure times are aware UTC
+        msg_time = last_msg.created_at if last_msg else order.created_at
+        if msg_time and msg_time.tzinfo is None:
+            msg_time = msg_time.replace(tzinfo=timezone.utc)
+
         chats.append(ChatSummaryResponse(
             order_id=order.id,
             other_user_id=other.id,
@@ -492,7 +505,7 @@ async def get_chat_list(
             other_user_role=other.role,
             other_master_id=order.master.id if is_client and order.master else None,
             last_message=last_msg.text if last_msg else None,
-            last_message_time=last_msg.created_at if last_msg else order.created_at,
+            last_message_time=msg_time,
             subcategory_name_ru=order.subcategory.name_ru,
             subcategory_name_uz=order.subcategory.name_uz,
             unread_count=unread_count
@@ -553,6 +566,11 @@ async def send_chat_message(
     
     # Notify recipient INSTANTLY
     try:
+        # Ensure aware UTC before isoformat
+        msg_created_at = msg.created_at
+        if msg_created_at and msg_created_at.tzinfo is None:
+            msg_created_at = msg_created_at.replace(tzinfo=timezone.utc)
+
         await notification_manager.send_notification(
             recipient_id, "chat_message",
             {
@@ -560,7 +578,7 @@ async def send_chat_message(
                 "sender_id": user.id,
                 "sender_name": user.name,
                 "text": data.text,
-                "created_at": msg.created_at.isoformat()
+                "created_at": msg_created_at.isoformat()
             }
         )
     except Exception as e:

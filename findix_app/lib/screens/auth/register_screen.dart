@@ -222,22 +222,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Privacy Policy link
-                Center(
-                  child: GestureDetector(
-                    onTap: () => _showPrivacyPolicy(context),
-                    child: Text(
-                      AppStrings.isRu
-                        ? '🔒 Политика конфиденциальности'
-                        : '🔒 Maxfiylik siyosati',
-                      style: TextStyle(
-                        color: Theme.of(context).primaryColor.withOpacity(0.7),
-                        fontSize: 13,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 20),
               ],
             ),

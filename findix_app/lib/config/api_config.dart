@@ -1,15 +1,15 @@
 class ApiConfig {
-  static const bool isProduction = false; // Toggle this for server deployment
+  static const bool isProduction = true; // Toggle this for server deployment
   
-  static const String devUrl = 'http://192.168.88.111:8010';
-  static const String prodUrl = 'https://api.yaqin.uz';
+  static const String devUrl = 'http://192.168.88.111:8005';
+  static const String prodUrl = 'http://yaqingo.uz';
   
   static String get baseUrl => isProduction ? prodUrl : devUrl;
   static String get wsBaseUrl => baseUrl.replaceFirst('http', 'ws');
   
   static String wsNotifications(int id) => '$wsBaseUrl/ws/notifications/$id';
 
-  static const String apiUrl = '$baseUrl/api';
+  static String get apiUrl => '$baseUrl/api';
 
   static String get authRegister => '$apiUrl/auth/register';
   static String get authLogin => '$apiUrl/auth/login';
@@ -37,6 +37,7 @@ class ApiConfig {
   static String adminUserDetail(int id) => '$apiUrl/admin/users/$id';
   static String get adminOrders => '$apiUrl/admin/orders';
   static String adminOrderDetail(int id) => '$apiUrl/admin/orders/$id';
+  static String get adminStats => '$apiUrl/admin/stats';
   
   static String get appReviews => '$apiUrl/app-reviews/';
 }
