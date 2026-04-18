@@ -139,20 +139,18 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   List<Widget> _buildWorkerTiers() {
-    final isRu = AppStrings.isRu;
     return [
-      _tierCard(isRu ? '1 День' : '1 Kun', '5,000 Сум', isRu ? '1 Объявление' : '1 ta e\'lon', Icons.bolt_rounded),
-      _tierCard(isRu ? '1 Неделя' : '1 Hafta', '30,000 Сум', isRu ? '10 Объявлений' : '10 ta e\'lon', Icons.auto_awesome_rounded),
-      _tierCard(isRu ? '1 Месяц' : '1 Oy', '150,000 Сум', isRu ? '45 Объявлений' : '45 ta e\'lon', Icons.star_rounded, isBest: true),
+      _tierCard('1 День', '5,000 Сум', '1 Объявление', Icons.bolt_rounded),
+      _tierCard('1 Неделя', '30,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded),
+      _tierCard('1 Месяц', '150,000 Сум', '45 Объявлений', Icons.star_rounded, isBest: true),
     ];
   }
 
   List<Widget> _buildEmployerTiers() {
-    final isRu = AppStrings.isRu;
     return [
-      _tierCard(isRu ? '1 День' : '1 Kun', '20,000 Сум', isRu ? '1 Объявление' : '1 ta e\'lon', Icons.bolt_rounded),
-      _tierCard(isRu ? '1 Неделя' : '1 Hafta', '150,000 Сум', isRu ? '10 Объявлений' : '10 ta e\'lon', Icons.auto_awesome_rounded),
-      _tierCard(isRu ? '1 Месяц' : '1 Oy', '300,000 Сум', isRu ? '30 Объявлений' : '30 ta e\'lon', Icons.star_rounded, isBest: true),
+      _tierCard('1 День', '20,000 Сум', '1 Объявление', Icons.bolt_rounded),
+      _tierCard('1 Неделя', '150,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded),
+      _tierCard('1 Месяц', '300,000 Сум', '30 Объявлений', Icons.star_rounded, isBest: true),
     ];
   }
 

@@ -10,20 +10,20 @@ from routers.auth import get_current_user_from_header, get_current_admin
 
 router = APIRouter(prefix="/api/subscriptions", tags=["Subscriptions"])
 
-# Plan limits by role
-PLAN_LIMITS = {
-    "master": {
-        "trial": 1,
-        "day": 1,
-        "week": 10,
-        "month": 45
-    },
-    "client": {
-        "trial": 1,
-        "day": 1,
-        "week": 10,
-        "month": 30
-    }
+# Plan limits (Worker / Иш олувчи)
+WORKER_PLAN_LIMITS = {
+    "trial": 2,      # 3 minutes full access
+    "day": 1,        
+    "week": 10,      
+    "month": 45      
+}
+
+# Plan limits (Employer / Иш берувчи)
+EMPLOYER_PLAN_LIMITS = {
+    "trial": 2,      
+    "day": 1,        
+    "week": 10,      
+    "month": 30      
 }
 
 @router.get("/my", response_model=SubscriptionResponse)
@@ -67,27 +67,26 @@ def activate_subscription(
     else: # month
         expires_at = now + timedelta(days=30)
         
-    # Use role to determine limits
-    role_limits = PLAN_LIMITS.get(user.role, PLAN_LIMITS["client"])
-    limit = role_limits.get(plan_name, 1)
-
+    # Calculate limits based on role
+    limits = WORKER_PLAN_LIMITS if user.role == "master" else EMPLOYER_PLAN_LIMITS
+    
     sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
     if not sub:
         sub = Subscription(
             user_id=user_id,
             user_role=user.role,
             plan_name=plan_name,
-            ads_limit=limit,
+            ads_limit=limits[plan_name],
             ads_used=0,
             expires_at=expires_at,
             is_active=True
         )
         db.add(sub)
     else:
-        sub.user_role = user.role # Sync role just in case
         sub.plan_name = plan_name
-        sub.ads_limit = limit
-        sub.ads_used = 0 # Reset count for new plan
+        sub.user_role = user.role
+        sub.ads_limit = limits[plan_name]
+        sub.ads_used = 0 
         sub.expires_at = expires_at
         sub.is_active = True
         

@@ -98,8 +98,8 @@ def build_order_response(order: Order, is_subscribed: bool = True) -> OrderRespo
     )
     
     if not is_subscribed:
-        res.client_phone = mask_phone(res.client_phone)
-        res.description = filter_description(res.description)
+        res.client_phone = mask_phone(res.client_phone or "")
+        res.description = filter_description(res.description or "")
         
     return res
 

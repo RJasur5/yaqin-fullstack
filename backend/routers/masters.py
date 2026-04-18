@@ -43,7 +43,7 @@ def build_master_card(profile: MasterProfile, is_subscribed: bool = True) -> Mas
     )
     if not is_subscribed:
         from utils.security import filter_description
-        res.description = filter_description(res.description)
+        res.description = filter_description(res.description or "")
         
     return res
 
