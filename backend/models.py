@@ -21,6 +21,7 @@ class User(Base):
     client_rating = Column(Float, default=0.0)
     client_reviews_count = Column(Integer, default=0)
     is_blocked = Column(Boolean, default=False)
+    is_trial_used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     master_profile = relationship("MasterProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
@@ -29,6 +30,7 @@ class User(Base):
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="client", foreign_keys="Order.client_id", cascade="all, delete-orphan")
     messages_sent = relationship("ChatMessage", back_populates="sender", cascade="all, delete-orphan")
+    subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
 
 class Category(Base):
@@ -170,3 +172,18 @@ class AppReview(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User")
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_role = Column(String(20), nullable=False)  # "master" or "client"
+    plan_name = Column(String(50), nullable=False)  # "trial", "day", "week", "month"
+    ads_limit = Column(Integer, default=0)
+    ads_used = Column(Integer, default=0)
+    expires_at = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    user = relationship("User", back_populates="subscription")

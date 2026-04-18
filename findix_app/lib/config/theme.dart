@@ -23,6 +23,7 @@ class AppColors {
   // Bridges for backward compatibility (defaults to light)
   static const Color primary = Color(0xFF00A651);
   static const Color primaryDark = Color(0xFF008C44);
+  static const Color secondary = Color(0xFF33B874);
   static const Color bgDark = Color(0xFFFFFFFF);
   static const Color bgCard = Color(0xFFF9FAFB);
   static const Color bgCardLight = Color(0xFFE5E7EB);

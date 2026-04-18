@@ -11,8 +11,9 @@ from models import User, MasterProfile
 from schemas import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserProfileUpdate, MessageResponse,
-    MasterProfileCreate
+    MasterProfileCreate, SubscriptionResponse
 )
+from models import Subscription
 from config import settings
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -90,6 +91,22 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # --- GRANT 3-MINUTE TRIAL ---
+    trial_expires = datetime.now(timezone.utc) + timedelta(minutes=3)
+    subscription = Subscription(
+        user_id=user.id,
+        user_role=user.role,
+        plan_name="trial",
+        ads_limit=1,
+        ads_used=0,
+        expires_at=trial_expires,
+        is_active=True
+    )
+    user.is_trial_used = True
+    db.add(subscription)
+    db.commit()
+    # ----------------------------
 
     token = create_token(user.id)
     return TokenResponse(

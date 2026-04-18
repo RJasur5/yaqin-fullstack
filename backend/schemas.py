@@ -120,6 +120,7 @@ class MasterCardResponse(BaseModel):
     is_available: bool = True
     is_blocked: bool = False
     portfolio_images: Optional[List[str]] = None
+    can_contact: bool = True  # New field for masking logic
 
 
 class MasterDetailResponse(MasterCardResponse):
@@ -234,6 +235,7 @@ class ChatSummaryResponse(BaseModel):
     subcategory_name_ru: str
     subcategory_name_uz: str
     unread_count: int = 0
+    can_chat: bool = True # New field
 
     @field_validator("last_message_time", mode="after")
     @classmethod
@@ -279,6 +281,7 @@ class OrderResponse(BaseModel):
     is_master_reviewed: bool = False
     include_lunch: bool = False
     include_taxi: bool = False
+    can_chat: bool = True # New field for masking logic
 
     class Config:
         from_attributes = True
@@ -338,6 +341,27 @@ class AppReviewResponse(BaseModel):
         from_attributes = True
 
     @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
+# ==================== SUBSCRIPTION ====================
+
+class SubscriptionResponse(BaseModel):
+    user_id: int
+    user_role: str
+    plan_name: str
+    ads_limit: int
+    ads_used: int
+    expires_at: datetime
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+    @field_validator("expires_at", mode="after")
     @classmethod
     def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
         if v and v.tzinfo is None:

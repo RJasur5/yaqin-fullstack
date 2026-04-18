@@ -11,6 +11,8 @@ import '../services/theme_service.dart';
 import '../widgets/gradient_button.dart';
 import 'master_profile_setup_screen.dart';
 import '../models/master.dart';
+import '../models/subscription.dart';
+import 'subscription_screen.dart';
 
 import 'admin/admin_panel_screen.dart';
 
@@ -25,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   MasterModel? _masterProfile;
+  SubscriptionModel? _subscription;
   bool _isLoadingMaster = false;
   String? _photoPath;
 
@@ -32,7 +35,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadMasterProfile();
+    _loadSubscription();
     _loadPhoto();
+  }
+
+  Future<void> _loadSubscription() async {
+    try {
+      final sub = await widget.apiService.getMySubscription();
+      if (mounted) setState(() => _subscription = sub);
+    } catch (_) {}
   }
 
   Future<void> _loadPhoto() async {
@@ -202,6 +213,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 user.name,
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Theme.of(context).textTheme.bodyLarge?.color),
               ),
+              if (_subscription != null && _subscription!.isActive) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(colors: [Color(0xFFFFD700), Color(0xFFFFA500)]),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.stars_rounded, color: Colors.white, size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        _subscription!.planTitle.toUpperCase(),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 10, letterSpacing: 0.5),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
 
               // Info cards
@@ -266,8 +298,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
               const SizedBox(height: 20),
 
-              // Job Actions — no Divider, just spacing
               const SizedBox(height: 8),
+
+              // SUBSCRIPTION BUTTON [GOLD STYLE]
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.2),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: GradientButton(
+                  text: AppStrings.isRu ? 'Управление подпиской' : 'Obunani boshqarish',
+                  icon: Icons.workspace_premium_rounded,
+                  colors: const [Color(0xFF6A11CB), Color(0xFF2575FC)], // Sharp blue/purple premium look
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SubscriptionScreen(apiService: widget.apiService),
+                      ),
+                    ).then((_) => _loadSubscription());
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
               
               // Admin Panel (Visible only to admins)
               if (user.isAdmin) ...[

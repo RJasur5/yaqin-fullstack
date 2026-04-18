@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../models/category.dart';
 import '../models/master.dart';
 import '../models/order.dart';
+import '../models/subscription.dart';
 
 class ApiService {
   String? _token;
@@ -586,5 +587,19 @@ class ApiService {
       return jsonDecode(res.body);
     }
     throw Exception('Failed to load admin stats');
+  }
+
+  // ==================== SUBSCRIPTIONS ====================
+
+  Future<SubscriptionModel> getMySubscription() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/my'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return SubscriptionModel.fromJson(jsonDecode(res.body));
+    }
+    throw Exception('Failed to load subscription info');
   }
 }

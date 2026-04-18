@@ -4,8 +4,9 @@ from typing import Optional, List
 from datetime import datetime, timezone
 
 from database import get_db, SessionLocal
-from models import User, MasterProfile, Subcategory, Category, Order, ClientReview, Review, ChatMessage
+from models import User, MasterProfile, Subcategory, Category, Order, ClientReview, Review, ChatMessage, Subscription
 from schemas import OrderCreate, OrderResponse, MessageResponse, ClientReviewCreate, ReviewCreate, ChatMessageResponse, ChatMessageCreate, ChatSummaryResponse
+from utils.security import mask_phone, filter_description
 from routers.auth import get_current_user_from_header
 from websocket_manager import manager
 from notification_manager import notification_manager
@@ -51,13 +52,25 @@ async def complete_order_after_delay(order_id: int):
     finally:
         db.close()
 
-def build_order_response(order: Order) -> OrderResponse:
+def check_subscription(user_id: int, db: Session) -> bool:
+    sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+    if not sub:
+        return False
+    if not sub.is_active:
+        return False
+    if sub.expires_at < datetime.now(timezone.utc):
+        sub.is_active = False
+        db.commit()
+        return False
+    return True
+
+def build_order_response(order: Order, is_subscribed: bool = True) -> OrderResponse:
     # Ensure created_at is timezone-aware UTC
     created_at = order.created_at
     if created_at and created_at.tzinfo is None:
         created_at = created_at.replace(tzinfo=timezone.utc)
         
-    return OrderResponse(
+    res = OrderResponse(
         id=order.id,
         client_id=order.client_id,
         client_name=order.client.name,
@@ -80,8 +93,15 @@ def build_order_response(order: Order) -> OrderResponse:
         is_client_reviewed=order.is_client_reviewed,
         is_master_reviewed=order.is_master_reviewed,
         include_lunch=order.include_lunch,
-        include_taxi=order.include_taxi
+        include_taxi=order.include_taxi,
+        can_chat=is_subscribed
     )
+    
+    if not is_subscribed:
+        res.client_phone = mask_phone(res.client_phone)
+        res.description = filter_description(res.description)
+        
+    return res
 
 @router.post("", response_model=OrderResponse)
 def create_order(
@@ -90,9 +110,16 @@ def create_order(
     authorization: str = Header(""),
     db: Session = Depends(get_db)
 ):
-    user = get_current_user_from_header(authorization, db)
     if user.is_blocked:
         raise HTTPException(status_code=403, detail="Ваш профиль заблокирован")
+    
+    # Check Subscription
+    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+    if not sub or not sub.is_active or sub.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=403, detail="Для размещения объявлений требуется активная подписка")
+    
+    if sub.ads_used >= sub.ads_limit:
+        raise HTTPException(status_code=403, detail=f"Лимит объявлений ({sub.ads_limit}) исчерпан")
         
     order = Order(
         client_id=user.id,
@@ -106,6 +133,10 @@ def create_order(
         status="open"
     )
     db.add(order)
+    
+    # Increment ads used
+    sub.ads_used += 1
+    
     db.commit()
     db.refresh(order)
     
@@ -179,7 +210,7 @@ def create_order(
         print(f"NOTIFY CRITICAL ERROR: {e}")
     # ---------------------------------
 
-    return build_order_response(order)
+    return build_order_response(order, is_subscribed=True)
 
 @router.get("/available", response_model=List[OrderResponse])
 def get_available_orders(
@@ -211,7 +242,9 @@ def get_available_orders(
         )
             
     orders = query.order_by(Order.created_at.desc()).all()
-    return [build_order_response(o) for o in orders]
+    
+    is_subscribed = check_subscription(user.id, db)
+    return [build_order_response(o, is_subscribed=is_subscribed) for o in orders]
 
 
 @router.post("/{order_id}/accept", response_model=OrderResponse)
@@ -256,7 +289,7 @@ async def accept_order(
     except Exception as e:
         print(f"NOTIFY ERROR in acceptance: {e}")
     # ------------------------------
-    return build_order_response(order)
+    return build_order_response(order, is_subscribed=True)
 
     return build_order_response(order)
 
@@ -305,7 +338,8 @@ def get_my_orders(
         db.commit()
         # No need to refresh everything, just return the updated list
         
-    return [build_order_response(o) for o in orders]
+    is_subscribed = check_subscription(user.id, db)
+    return [build_order_response(o, is_subscribed=is_subscribed) for o in orders]
 
 @router.post("/{order_id}/rate_client", response_model=MessageResponse)
 def rate_client(

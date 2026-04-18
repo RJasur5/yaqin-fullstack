@@ -21,6 +21,7 @@ class MasterModel {
   final List<String> portfolioImages;
   final List<ReviewModel>? reviews;
   final String? phone;
+  final bool canContact;
 
   MasterModel({
     required this.id,
@@ -45,6 +46,7 @@ class MasterModel {
     this.portfolioImages = const [],
     this.reviews,
     this.phone,
+    this.canContact = true,
   });
 
   factory MasterModel.fromJson(Map<String, dynamic> json) {
@@ -73,6 +75,7 @@ class MasterModel {
           ? (json['reviews'] as List).map((r) => ReviewModel.fromJson(r)).toList()
           : null,
       phone: json['phone'],
+      canContact: json['can_contact'] ?? true,
     );
   }
 

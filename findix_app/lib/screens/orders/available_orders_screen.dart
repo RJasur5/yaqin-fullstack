@@ -131,6 +131,29 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
     );
   }
 
+  void _showSubscriptionRequired() {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardTheme.color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(AppStrings.isRu ? 'Требуется подписка' : 'Obuna talab qilinadi'),
+        content: Text(
+          AppStrings.isRu 
+            ? 'Для принятия заказов и связи с клиентом необходима активная подписка.' 
+            : 'Buyurtmalarni qabul qilish va mijoz bilan bog\'lanish uchun faol obuna bo\'lishi kerak.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(AppStrings.isRu ? 'Понятно' : 'Tushunarli'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -609,7 +632,13 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
                   height: 48,
                   child: GradientButton(
                     text: AppStrings.isRu ? 'Принять' : 'Qabul qilish',
-                    onPressed: () => _acceptOrder(order['id']),
+                    onPressed: () {
+                      if (order['can_chat'] == false) {
+                        _showSubscriptionRequired();
+                        return;
+                      }
+                      _acceptOrder(order['id']);
+                    },
                   ),
                 ),
               ],

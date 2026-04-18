@@ -10,12 +10,14 @@ from schemas import (
     MasterProfileUpdate, ReviewCreate, ReviewResponse, MessageResponse
 )
 from routers.auth import get_current_user_from_header
+from routers.orders import check_subscription
+from utils.security import mask_phone
 
 router = APIRouter(prefix="/api/masters", tags=["Masters"])
 
 
-def build_master_card(profile: MasterProfile) -> MasterCardResponse:
-    return MasterCardResponse(
+def build_master_card(profile: MasterProfile, is_subscribed: bool = True) -> MasterCardResponse:
+    res = MasterCardResponse(
         id=profile.id,
         user_id=profile.user_id,
         user_name=profile.user.name,
@@ -37,7 +39,13 @@ def build_master_card(profile: MasterProfile) -> MasterCardResponse:
         is_available=profile.is_available,
         is_blocked=profile.is_blocked,
         portfolio_images=profile.portfolio_images,
+        can_contact=is_subscribed
     )
+    if not is_subscribed:
+        from utils.security import filter_description
+        res.description = filter_description(res.description)
+        
+    return res
 
 
 @router.get("", response_model=List[MasterCardResponse])
@@ -50,8 +58,15 @@ def get_masters(
     sort_by: Optional[str] = Query("rating"),  # "rating", "experience", "price"
     limit: int = Query(50, le=100),
     offset: int = Query(0),
+    authorization: str = Header(""),
     db: Session = Depends(get_db),
 ):
+    try:
+        user = get_current_user_from_header(authorization, db)
+        is_subscribed = check_subscription(user.id, db)
+    except:
+        is_subscribed = False
+
     query = (
         db.query(MasterProfile)
         .join(User)
@@ -86,11 +101,20 @@ def get_masters(
         query = query.order_by(MasterProfile.hourly_rate.asc())
 
     profiles = query.offset(offset).limit(limit).all()
-    return [build_master_card(p) for p in profiles]
+    return [build_master_card(p, is_subscribed=is_subscribed) for p in profiles]
 
 
 @router.get("/{master_id}", response_model=MasterDetailResponse)
-def get_master_detail(master_id: int, db: Session = Depends(get_db)):
+def get_master_detail(
+    master_id: int, 
+    authorization: str = Header(""),
+    db: Session = Depends(get_db)
+):
+    try:
+        user = get_current_user_from_header(authorization, db)
+        is_subscribed = check_subscription(user.id, db)
+    except:
+        is_subscribed = False
     profile = (
         db.query(MasterProfile)
         .options(
@@ -104,7 +128,7 @@ def get_master_detail(master_id: int, db: Session = Depends(get_db)):
     if not profile:
         raise HTTPException(status_code=404, detail="Master not found")
 
-    card = build_master_card(profile)
+    card = build_master_card(profile, is_subscribed=is_subscribed)
     reviews = []
     for r in profile.reviews:
         created_at = r.created_at
@@ -122,10 +146,15 @@ def get_master_detail(master_id: int, db: Session = Depends(get_db)):
             created_at=created_at,
         ))
 
+    
+    phone = profile.user.phone
+    if not is_subscribed:
+        phone = mask_phone(phone)
+
     return MasterDetailResponse(
         **card.dict(),
         reviews=reviews,
-        phone=profile.user.phone,
+        phone=phone,
     )
 
 

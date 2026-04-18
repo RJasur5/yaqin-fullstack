@@ -110,6 +110,26 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
     );
   }
 
+  void _showSubscriptionRequired() {
+    final theme = Theme.of(context);
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.cardTheme.color,
+        title: Text(AppStrings.isRu ? "Требуется подписка" : "Obuna talab qilinadi"),
+        content: Text(AppStrings.isRu 
+          ? "Для просмотра контактов и связи с мастером необходима активная подписка." 
+          : "Kontaktlarni ko'rish va usta bilan bog'lanish uchun faol obuna bo'lishi kerak."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(AppStrings.isRu ? "Понятно" : "Tushunarli"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -396,6 +416,10 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                       text: AppStrings.call,
                       icon: Icons.phone_rounded,
                       onPressed: () async {
+                        if (!_master!.canContact) {
+                          _showSubscriptionRequired();
+                          return;
+                        }
                         if (_master!.phone != null) {
                           final uri = Uri.parse('tel:${_master!.phone}');
                           if (await canLaunchUrl(uri)) launchUrl(uri);

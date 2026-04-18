@@ -1,0 +1,19 @@
+import re
+
+def mask_phone(phone: str) -> str:
+    """Masks a phone number, e.g., +998901234567 -> +99890***4567"""
+    if not phone or len(phone) < 10:
+        return phone
+    # Basic masking for +998991234567 -> +99899***4567
+    return f"{phone[:6]}***{phone[-4:]}"
+
+def filter_description(text: str) -> str:
+    """Replaces phone numbers in text with [номер скрыт]."""
+    if not text:
+        return text
+    
+    # Pattern to match various formats of phone numbers
+    # Matches: +998901234567, 998901234567, 901234567, (90)1234567, 90-123-45-67 etc.
+    phone_pattern = r'(\+?\d{1,3}[\s-]?\(?\d{2,3}\)?[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2})|(\d{9,12})'
+    
+    return re.sub(phone_pattern, '[номер скрыт]', text)

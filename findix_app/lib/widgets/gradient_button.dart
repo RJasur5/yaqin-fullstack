@@ -7,6 +7,7 @@ class GradientButton extends StatelessWidget {
   final bool isLoading;
   final double? width;
   final IconData? icon;
+  final List<Color>? colors;
 
   const GradientButton({
     super.key,
@@ -15,6 +16,7 @@ class GradientButton extends StatelessWidget {
     this.isLoading = false,
     this.width,
     this.icon,
+    this.colors,
   });
 
   @override
@@ -23,7 +25,13 @@ class GradientButton extends StatelessWidget {
       width: width ?? double.infinity,
       height: 56,
       decoration: BoxDecoration(
-        gradient: onPressed != null ? AppColors.primaryGradient : null,
+        gradient: onPressed != null 
+            ? LinearGradient(
+                colors: colors ?? AppColors.primaryGradient.colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ) 
+            : null,
         color: onPressed == null ? AppColors.textHint : null,
         borderRadius: BorderRadius.circular(16),
         boxShadow: onPressed != null

@@ -6,7 +6,7 @@ import time
 from typing import Dict, List
 
 from database import engine, Base
-from routers import auth, masters, categories, favorites, orders, clients, admin, app_reviews
+from routers import auth, masters, categories, favorites, orders, clients, admin, app_reviews, subscriptions
 
 from websocket_manager import manager
 from logging_config import setup_logging
@@ -88,6 +88,7 @@ app.include_router(orders.router)
 app.include_router(clients.router)
 app.include_router(admin.router)
 app.include_router(app_reviews.router)
+app.include_router(subscriptions.router)
 
 # WebSocket Endpoint
 @app.websocket("/ws/notifications/{user_id}")

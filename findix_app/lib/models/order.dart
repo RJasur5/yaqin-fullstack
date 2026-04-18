@@ -24,6 +24,7 @@ class OrderResponse {
   final bool isMasterReviewed;
   final bool includeLunch;
   final bool includeTaxi;
+  final bool canChat;
 
   OrderResponse({
     required this.id,
@@ -49,6 +50,7 @@ class OrderResponse {
     this.isMasterReviewed = false,
     this.includeLunch = false,
     this.includeTaxi = false,
+    this.canChat = true,
   });
 
   factory OrderResponse.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,7 @@ class OrderResponse {
       isMasterReviewed: json['is_master_reviewed'] ?? false,
       includeLunch: json['include_lunch'] ?? false,
       includeTaxi: json['include_taxi'] ?? false,
+      canChat: json['can_chat'] ?? true,
     );
   }
 
