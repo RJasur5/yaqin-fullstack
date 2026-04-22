@@ -22,6 +22,7 @@ services:
       - ./backend/.env
     volumes:
       - ./backend/uploads:/app/uploads
+      - ./backend/findix.db:/app/findix.db
     depends_on:
       - db
     networks:
