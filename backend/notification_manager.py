@@ -1,8 +1,13 @@
 from typing import List, Optional
 import json
+import logging
 
 from websocket_manager import manager
 from database import SessionLocal
+from models import User
+from services.fcm_service import fcm_service
+
+logger = logging.getLogger(__name__)
 
 class NotificationManager:
     @staticmethod
@@ -12,16 +17,64 @@ class NotificationManager:
         payload_data: dict
     ):
         """
-        Sends a real-time notification via WebSocket.
+        Sends a real-time notification via WebSocket and Push (FCM).
         """
-        # Prepare payload
+        # 1. Prepare WebSocket payload
         ws_payload = {
             "type": type,
             **payload_data
         }
 
-        # Send if online
+        # 2. Try WebSocket delivery (for foreground app)
         await manager.send_personal_message(ws_payload, user_id)
 
+        # 3. Try FCM Push delivery (for background/terminated app)
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.id == user_id).first()
+            if user and user.fcm_token:
+                # Generate user-friendly title/body based on type
+                title, body = NotificationManager._get_notif_content(user, type, payload_data)
+                
+                # Send push
+                await fcm_service.send_push_notification(
+                    token=user.fcm_token,
+                    title=title,
+                    body=body,
+                    data={"type": type, "payload": json.dumps(payload_data)}
+                )
+        except Exception as e:
+            logger.error(f"NotificationManager: Failed to send FCM for user {user_id}: {e}")
+        finally:
+            db.close()
+
+    @staticmethod
+    def _get_notif_content(user, type: str, data: dict) -> tuple:
+        """Helper to generate localized text for notifications."""
+        lang = user.lang or "ru"
+        
+        if type == "new_order":
+            if lang == "ru":
+                return "Новый заказ!", f"Появился заказ: {data.get('subcategory_name_ru', 'Детали в приложении')}"
+            else:
+                return "Yangi buyurtma!", f"Buyurtma bor: {data.get('subcategory_name_uz', 'Batafsil ilovada')}"
+                
+        if type == "order_accepted":
+            if lang == "ru":
+                return "Заказ принят", f"Мастер {data.get('master_name', '')} принял ваш заказ"
+            else:
+                return "Buyurtma qabul qilindi", f"Usta {data.get('master_name', '')} buyurtmangizni qabul qildi"
+                
+        if type == "chat_message":
+            return f"{data.get('sender_name', 'Сообщение')}", data.get("text", "Новое сообщение")
+            
+        if type == "order_completed":
+            if lang == "ru":
+                return "Заказ завершен", "Ваш заказ успешно выполнен"
+            else:
+                return "Buyurtma yakunlandi", "Buyurtmangiz muvaffaqiyatli yakunlandi"
+                
+        return "Yaqin", "Новое уведомление"
 
 notification_manager = NotificationManager()
+

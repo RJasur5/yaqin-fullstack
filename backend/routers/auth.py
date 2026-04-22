@@ -11,7 +11,7 @@ from models import User, MasterProfile
 from schemas import (
     UserRegister, UserLogin, TokenResponse,
     UserResponse, UserProfileUpdate, MessageResponse,
-    MasterProfileCreate, SubscriptionResponse
+    MasterProfileCreate, SubscriptionResponse, FCMTokenUpdate
 )
 from models import Subscription
 from config import settings
@@ -25,7 +25,7 @@ TOKEN_EXPIRE_DAYS = settings.TOKEN_EXPIRE_DAYS
 
 
 def create_token(user_id: int) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=TOKEN_EXPIRE_DAYS)
+    expire = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=TOKEN_EXPIRE_DAYS)
     data = {"sub": str(user_id), "exp": expire}
     return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -92,13 +92,13 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    # --- GRANT 3-MINUTE TRIAL ---
-    trial_expires = datetime.now(timezone.utc) + timedelta(minutes=3)
+    # --- GRANT 2-MINUTE TRIAL ---
+    trial_expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(minutes=2)
     subscription = Subscription(
         user_id=user.id,
         user_role=user.role,
         plan_name="trial",
-        ads_limit=2,
+        ads_limit=10, # Give more ads for trial
         ads_used=0,
         expires_at=trial_expires,
         is_active=True
@@ -195,5 +195,18 @@ def admin_change_user_password(
     user_to_update.password_hash = pwd_context.hash(new_password)
     db.commit()
     return MessageResponse(message=f"Пароль пользователя {user_to_update.name} успешно изменен")
+
+
+@router.post("/fcm-token", response_model=MessageResponse)
+def update_fcm_token(
+    data: FCMTokenUpdate,
+    user: User = Depends(get_current_user_from_header),
+    db: Session = Depends(get_db)
+):
+    """Update user's FCM token for push notifications."""
+    user.fcm_token = data.fcm_token
+    db.commit()
+    return MessageResponse(message="FCM token updated successfully")
+
 
 

@@ -1,0 +1,48 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: findix-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-findix_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-findix_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-findix_db}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - findix-network
+
+  backend:
+    image: findix-backend:v-final
+    container_name: findix-backend
+    restart: always
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - db
+    networks:
+      - findix-network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: findix-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/certbot/conf:/etc/letsencrypt:ro
+      - ./deploy/certbot/www:/var/www/certbot:ro
+      - ./downloads:/app/downloads:ro
+    networks:
+      - findix-network
+
+volumes:
+  postgres_data:
+networks:
+  findix-network:

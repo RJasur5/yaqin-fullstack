@@ -1,18 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session, joinedload
 from database import get_db
 from models import User, ClientReview, MasterProfile
 from schemas import ClientDetailResponse, ClientReviewResponse
+from routers.auth import get_current_user_from_header
 
 router = APIRouter(prefix="/api/clients", tags=["Clients"])
 
 @router.get("/{client_id}", response_model=ClientDetailResponse)
 def get_client_profile(
     client_id: int,
+    authorization: str = Header(""),
     db: Session = Depends(get_db)
 ):
-    client = db.query(User).filter(User.id == client_id, User.role == "client").first()
-    # Note: Masters can also act as clients, so maybe don't filter by role == "client" strictly, just get by ID
+    try:
+        user = get_current_user_from_header(authorization, db)
+        from routers.orders import check_subscription
+        is_subscribed = check_subscription(user.id, db)
+    except:
+        is_subscribed = False
+
     client = db.query(User).filter(User.id == client_id).first()
     
     if not client:
@@ -22,7 +29,6 @@ def get_client_profile(
         joinedload(ClientReview.master).joinedload(MasterProfile.user)
     ).filter(ClientReview.client_id == client_id).order_by(ClientReview.created_at.desc()).all()
     
-    # We map to ClientReviewResponse manually
     review_responses = []
     for r in reviews:
         review_responses.append(ClientReviewResponse(
@@ -35,11 +41,16 @@ def get_client_profile(
             comment=r.comment,
             created_at=r.created_at
         ))
+    
+    phone = client.phone
+    if not is_subscribed:
+        from utils.security import mask_phone
+        phone = mask_phone(phone)
         
     resp = ClientDetailResponse(
         id=client.id,
         name=client.name,
-        phone=client.phone,
+        phone=phone,
         role=client.role,
         avatar=client.avatar,
         city=client.city,

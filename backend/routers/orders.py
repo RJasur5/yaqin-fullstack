@@ -53,22 +53,42 @@ async def complete_order_after_delay(order_id: int):
         db.close()
 
 def check_subscription(user_id: int, db: Session) -> bool:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return False
+        
+    # ADMINS ALWAYS HAVE ACCESS
+    if user.role == "admin":
+        return True
+
     sub = db.query(Subscription).filter(Subscription.user_id == user_id).first()
     if not sub:
         return False
     if not sub.is_active:
         return False
-    if sub.expires_at < datetime.now(timezone.utc):
+        
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    expires_at = sub.expires_at
+    if expires_at and expires_at.tzinfo is not None:
+        expires_at = expires_at.replace(tzinfo=None)
+        
+    if expires_at < now:
+        # SPECIAL LOGIC: If it's a day plan and hasn't been used yet, don't expire it.
+        if sub.plan_name == "day" and sub.ads_used == 0:
+            return True
+            
+        # Auto-expire
         sub.is_active = False
         db.commit()
         return False
+    
     return True
 
 def build_order_response(order: Order, is_subscribed: bool = True) -> OrderResponse:
     # Ensure created_at is timezone-aware UTC
     created_at = order.created_at
-    if created_at and created_at.tzinfo is None:
-        created_at = created_at.replace(tzinfo=timezone.utc)
+    if created_at and created_at.tzinfo is not None:
+        created_at = created_at.replace(tzinfo=None)
         
     res = OrderResponse(
         id=order.id,
@@ -110,16 +130,22 @@ def create_order(
     authorization: str = Header(""),
     db: Session = Depends(get_db)
 ):
+    user = get_current_user_from_header(authorization, db)
     if user.is_blocked:
         raise HTTPException(status_code=403, detail="Ваш профиль заблокирован")
     
-    # Check Subscription
-    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
-    if not sub or not sub.is_active or sub.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=403, detail="Для размещения объявлений требуется активная подписка")
-    
-    if sub.ads_used >= sub.ads_limit:
-        raise HTTPException(status_code=403, detail=f"Лимит объявлений ({sub.ads_limit}) исчерпан")
+    # Check Subscription & Limits
+    if user.role != "admin":
+        if not check_subscription(user.id, db):
+            raise HTTPException(status_code=403, detail="Для размещения объявлений требуется активная подписка")
+        
+        sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+        if not sub:
+            raise HTTPException(status_code=403, detail="Подписка не найдена")
+        if sub.ads_used >= sub.ads_limit:
+            raise HTTPException(status_code=403, detail="Лимит объявлений исчерпан")
+        
+        sub.ads_used += 1
         
     order = Order(
         client_id=user.id,
@@ -133,10 +159,6 @@ def create_order(
         status="open"
     )
     db.add(order)
-    
-    # Increment ads used
-    sub.ads_used += 1
-    
     db.commit()
     db.refresh(order)
     
@@ -259,6 +281,20 @@ async def accept_order(
     if not profile:
         raise HTTPException(status_code=403, detail="Only masters can accept orders")
         
+    # --- SUBSCRIPTION CHECK FOR WORKER ---
+    if user.role != "admin":
+        if not check_subscription(user.id, db):
+            raise HTTPException(status_code=403, detail="Для принятия заказов требуется активная подписка")
+            
+        sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+        if not sub:
+            raise HTTPException(status_code=403, detail="Подписка не найдена")
+        if sub.ads_used >= sub.ads_limit:
+            raise HTTPException(status_code=403, detail="Лимит принятых заказов исчерпан. Пожалуйста, обновите подписку.")
+        
+        sub.ads_used += 1
+    # -------------------------------------
+        
     order = db.query(Order).filter(Order.id == order_id).first()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
@@ -268,7 +304,8 @@ async def accept_order(
         
     order.master_id = profile.id
     order.status = "accepted"
-    order.accepted_at = datetime.now(timezone.utc)
+    order.accepted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    
     db.commit()
     db.refresh(order)
     
@@ -320,17 +357,17 @@ def get_my_orders(
     orders = query.order_by(Order.created_at.desc()).all()
     
     # Auto-completion logic: if accepted > 5 mins ago, mark as completed
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     updated = False
     for o in orders:
         if o.status == "accepted" and o.accepted_at:
-            # Ensure o.accepted_at has timezone info if it doesn't (SQLite sometimes has issues)
             acc_at = o.accepted_at
-            if acc_at.tzinfo is None:
-                acc_at = acc_at.replace(tzinfo=timezone.utc)
+            # Standardize BOTH to naive UTC for comparison
+            if acc_at.tzinfo is not None:
+                acc_at = acc_at.replace(tzinfo=None)
                 
             diff = now - acc_at
-            if diff.total_seconds() >= 60: # 1 minute for testing
+            if diff.total_seconds() >= 86400: # 24 hours to prevent premature completion
                 o.status = "completed"
                 updated = True
     
@@ -365,7 +402,7 @@ def rate_client(
         acc_at = order.accepted_at
         if acc_at.tzinfo is None:
             acc_at = acc_at.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - acc_at).total_seconds() >= 300:
+        if (datetime.now(timezone.utc).replace(tzinfo=None) - acc_at).total_seconds() >= 300:
             can_rate = True
             
     if not can_rate:

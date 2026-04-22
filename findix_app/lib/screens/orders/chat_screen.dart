@@ -9,6 +9,7 @@ import '../master_detail_screen.dart';
 import '../client_profile_screen.dart';
 import '../../utils/date_utils.dart';
 import 'package:intl/intl.dart';
+import '../../services/notification_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final Map<String, dynamic> order;
@@ -37,6 +38,10 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _loadHistory();
     _markRead();
+    
+    // Track active chat to suppress redundant notifications
+    NotificationService.activeChatOrderId = widget.order['id'];
+
     // Listen to real-time events that hit our background listener
     SocketService().messageStream.listen((data) {
       if (!mounted) return;
@@ -330,5 +335,16 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    // Clear active chat tracking
+    if (NotificationService.activeChatOrderId == widget.order['id']) {
+      NotificationService.activeChatOrderId = null;
+    }
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
   }
 }

@@ -20,6 +20,7 @@ import 'screens/app_reviews_screen.dart';
 import 'services/socket_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
+import 'screens/orders/chat_list_screen.dart';
 import 'dart:async';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -40,8 +41,8 @@ void main() async {
     apiService.setToken(token);
   }
   
-  // Initialize notification service for UI alerts
-  await NotificationService.instance.init();
+  // Initialize notification service for UI alerts and FCM
+  await NotificationService.instance.init(authService: authService);
   
   // Initialize Theme Service
   final themeService = ThemeService();
@@ -105,10 +106,10 @@ void onStart(ServiceInstance service) async {
   });
 
   try {
-    await NotificationService().init(requestPermission: false);
-    
     final apiService = ApiService();
     final authService = AuthService(apiService);
+    await NotificationService().init(requestPermission: false, authService: authService);
+
     
     service.on('updateConfig').listen((event) async {
        final userId = event?['userId'];
@@ -189,6 +190,10 @@ class YaqinApp extends StatelessWidget {
             '/onboarding': (context) => const OnboardingScreen(),
             '/language-select': (context) => LanguageSelectScreen(authService: authService),
             '/app-reviews': (context) => AppReviewsScreen(apiService: apiService),
+            '/chats': (context) => ChatListScreen(
+              apiService: apiService, 
+              currentUserId: authService.userId ?? 0
+            ),
           },
         );
       },

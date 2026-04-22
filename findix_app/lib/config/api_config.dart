@@ -2,7 +2,7 @@ class ApiConfig {
   static const bool isProduction = true; // Toggle this for server deployment
   
   static const String devUrl = 'http://192.168.88.111:8005';
-  static const String prodUrl = 'http://yaqingo.uz';
+  static const String prodUrl = 'http://95.182.118.245';
   
   static String get baseUrl => isProduction ? prodUrl : devUrl;
   static String get wsBaseUrl => baseUrl.replaceFirst('http', 'ws');
@@ -15,6 +15,7 @@ class ApiConfig {
   static String get authLogin => '$apiUrl/auth/login';
   static String get authMe => '$apiUrl/auth/me';
   static String get authProfile => '$apiUrl/auth/profile';
+  static String get authFcmToken => '$apiUrl/auth/fcm-token';
   static String get masters => '$apiUrl/masters';
   static String get masterProfile => '$apiUrl/masters/profile';
   static String get categories => '$apiUrl/categories';

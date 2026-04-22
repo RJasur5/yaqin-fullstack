@@ -92,6 +92,17 @@ class ApiService {
     throw Exception(msg);
   }
 
+  Future<void> updateFCMToken(String token) async {
+    final res = await http.post(
+      Uri.parse(ApiConfig.authFcmToken),
+      headers: _headers,
+      body: jsonEncode({'fcm_token': token}),
+    ).timeout(const Duration(seconds: 20));
+    if (res.statusCode != 200) {
+      throw Exception('Failed to update FCM token');
+    }
+  }
+
   Future<UserModel> uploadAvatar(String imagePath) async {
     final request = http.MultipartRequest('POST', Uri.parse('${ApiConfig.apiUrl}/auth/me/avatar'));
     if (_token != null) {
@@ -601,5 +612,28 @@ class ApiService {
       return SubscriptionModel.fromJson(jsonDecode(res.body));
     }
     throw Exception('Failed to load subscription info');
+  }
+
+  Future<SubscriptionModel> payWithCard({
+    required String cardNumber,
+    required String expiry,
+    required String cvv,
+    required String planName,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/pay-card'),
+      headers: _headers,
+      body: jsonEncode({
+        'card_number': cardNumber,
+        'expiry': expiry,
+        'cvv': cvv,
+        'plan_name': planName,
+      }),
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return SubscriptionModel.fromJson(jsonDecode(res.body));
+    }
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Payment failed');
   }
 }

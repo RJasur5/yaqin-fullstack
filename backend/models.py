@@ -22,7 +22,8 @@ class User(Base):
     client_reviews_count = Column(Integer, default=0)
     is_blocked = Column(Boolean, default=False)
     is_trial_used = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    fcm_token = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     master_profile = relationship("MasterProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
     reviews_given = relationship("Review", back_populates="client", foreign_keys="Review.client_id", cascade="all, delete-orphan")
@@ -92,7 +93,7 @@ class Review(Base):
     client_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5
     comment = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     master = relationship("MasterProfile", back_populates="reviews", foreign_keys=[master_id])
     client = relationship("User", back_populates="reviews_given", foreign_keys=[client_id])
@@ -106,7 +107,7 @@ class ClientReview(Base):
     master_id = Column(Integer, ForeignKey("master_profiles.id"), nullable=False)
     rating = Column(Integer, nullable=False)  # 1-5
     comment = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     client = relationship("User", back_populates="client_reviews_received", foreign_keys=[client_id])
     master = relationship("MasterProfile", back_populates="client_reviews_given", foreign_keys=[master_id])
@@ -118,7 +119,7 @@ class Favorite(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     master_id = Column(Integer, ForeignKey("master_profiles.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user = relationship("User", back_populates="favorites")
     master = relationship("MasterProfile")
@@ -136,7 +137,7 @@ class Order(Base):
     district = Column(String(100), nullable=True)
     price = Column(Float, nullable=True)
     status = Column(String(20), default="open")  # open, accepted, completed, cancelled
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     accepted_at = Column(DateTime, nullable=True)
     is_client_reviewed = Column(Boolean, default=False)
     is_master_reviewed = Column(Boolean, default=False)
@@ -156,7 +157,7 @@ class ChatMessage(Base):
     sender_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     text = Column(Text, nullable=False)
     is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     order = relationship("Order", back_populates="messages")
     sender = relationship("User", back_populates="messages_sent")
@@ -169,7 +170,7 @@ class AppReview(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     rating = Column(Integer, nullable=False)
     comment = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user = relationship("User")
 

@@ -18,6 +18,10 @@ class UserLogin(BaseModel):
     phone: str
     password: str
 
+class FCMTokenUpdate(BaseModel):
+    fcm_token: str
+
+
 
 class UserResponse(BaseModel):
     id: int
@@ -348,6 +352,12 @@ class AppReviewResponse(BaseModel):
         return v
 
 # ==================== SUBSCRIPTION ====================
+
+class PaymentRequest(BaseModel):
+    card_number: str
+    expiry: str
+    cvv: str
+    plan_name: str  # "day", "week", "month"
 
 class SubscriptionResponse(BaseModel):
     user_id: int

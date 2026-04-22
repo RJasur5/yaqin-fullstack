@@ -117,7 +117,7 @@ class SocketService {
             id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
             title: '⚡ Новый заказ!',
             body: '${data['subcategory_name_ru']}: ${data['description']}',
-            payload: 'available_orders',
+            data: {'type': 'available_orders'},
           );
         }
       } else if (data['type'] == 'order_accepted') {
@@ -127,23 +127,31 @@ class SocketService {
           body: AppStrings.isRu 
             ? 'Мастер ${data['master_name']} принял ваш заказ: ${data['subcategory_name_ru']}'
             : 'Usta ${data['master_name']} buyurtmangizni qabul qildi: ${data['subcategory_name_uz']}',
-          payload: 'my_orders',
+          data: {'type': 'my_orders'},
         );
       } else if (data['type'] == 'order_completed') {
         NotificationService.instance.showNotification(
           id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
           title: '✅ Yaqin',
           body: AppStrings.orderCompleted,
-          payload: 'my_orders',
+          data: {'type': 'my_orders'},
         );
       } else if (data['type'] == 'chat_message') {
         _messageController.add(data); // BROADCAST TO UI
+        
+        // Suppress notification if user is ALREADY in this chat
+        final orderId = data['order_id'] is int ? data['order_id'] : int.tryParse(data['order_id']?.toString() ?? '');
+        if (orderId != null && orderId == NotificationService.activeChatOrderId) {
+          debugPrint('SOCKET_SERVICE: Suppressing notification for active chat $orderId');
+          return;
+        }
+
         // Show notification for incoming chat messages
         NotificationService.instance.showNotification(
           id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
           title: '💬 Сообщение от ${data['sender_name'] ?? 'пользователя'}',
           body: data['text'] ?? '',
-          payload: 'chat_${data['order_id']}',
+          data: {'type': 'chat_${data['order_id']}'},
         );
       }
     } catch (e) {

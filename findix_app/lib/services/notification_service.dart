@@ -1,7 +1,18 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'auth_service.dart';
+import 'package:flutter/foundation.dart';
 import 'dart:io' show Platform;
 import '../main.dart';
+import 'dart:convert';
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  // Handle background message
+}
+
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,9 +23,52 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   static final NotificationService instance = NotificationService._internal();
+  
+  dynamic _pendingPayload;
+  bool _isNavigationInProgress = false;
 
-  Future<void> init({bool requestPermission = true}) async {
-    if (kIsWeb) return; // Skip initialization on Web
+  // Track the current chat to suppress notifications while reading
+  static int? activeChatOrderId;
+
+  Future<void> init({bool requestPermission = true, AuthService? authService}) async {
+    if (kIsWeb) return; 
+
+    // Initialize Firebase if not already initialized
+    await Firebase.initializeApp();
+
+    // Set background handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Listen for token refresh and update backend
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+      if (authService != null) {
+        authService.updateFCMToken(newToken);
+      }
+    });
+
+    // Request permissions for iOS
+    if (Platform.isIOS) {
+       await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+       );
+    }
+
+    // Retrieve and register FCM Token
+    String? token = await FirebaseMessaging.instance.getToken();
+    if (token != null && authService != null) {
+       print("FCM Token: $token");
+       await authService.updateFCMToken(token);
+    }
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      // System notification suppressed in foreground as requested.
+      // Internal overlays are handled by SocketService.
+      debugPrint('NOTIFICATION_SERVICE: Foreground message received (system UI suppressed)');
+    });
+
 
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -30,24 +84,29 @@ class NotificationService {
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        final payload = response.payload;
-        if (payload != null && payload.isNotEmpty) {
-           final nav = YaqinApp.navigatorKey.currentState;
-           if (nav != null) {
-              if (payload.startsWith('chat_')) {
-                 final orderId = int.tryParse(payload.split('_')[1]);
-                 if (orderId != null) {
-                    nav.pushNamed('/chat', arguments: orderId);
-                 }
-              } else if (payload == 'available_orders') {
-                 nav.pushNamed('/available-orders');
-              } else if (payload == 'my_orders') {
-                 nav.pushNamed('/my-orders');
-              }
-           }
-        }
+        handlePayload(response.payload);
       },
     );
+
+    // 1. CAPTURE TERMINATED STATE MESSAGE IMMEDIATELY
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null && initialMessage.data.isNotEmpty) {
+      debugPrint('NOTIFICATION_SERVICE: Captured initial message on init');
+      _pendingPayload = initialMessage.data;
+    } else {
+      // 2. CHECK LOCAL NOTIFICATIONS AS FALLBACK
+      final NotificationAppLaunchDetails? details = 
+          await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+      if (details != null && details.didNotificationLaunchApp) {
+        debugPrint('NOTIFICATION_SERVICE: Captured local notification launch');
+        _pendingPayload = details.notificationResponse?.payload;
+      }
+    }
+
+    // Handle clicks when app is in background
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+       handlePayload(message.data);
+    });
 
     if (Platform.isAndroid) {
       final androidPlugin = flutterLocalNotificationsPlugin
@@ -82,15 +141,79 @@ class NotificationService {
     }
   }
 
+  Future<void> handlePayload(dynamic data) async {
+    if (data == null) return;
+    
+    // Convert string to map if needed
+    Map<String, dynamic> finalData = {};
+    if (data is String) {
+      if (data.isEmpty) return;
+      try {
+        final parsed = json.decode(data);
+        if (parsed is Map) {
+          finalData = Map<String, dynamic>.from(parsed);
+        } else {
+          finalData['type'] = data;
+        }
+      } catch (_) {
+        finalData['type'] = data;
+      }
+    } else if (data is Map) {
+      finalData = Map<String, dynamic>.from(data);
+    }
+
+    final type = finalData['type']?.toString();
+    if (type == null) return;
+
+    var nav = YaqinApp.navigatorKey.currentState;
+    
+    // If navigator is not ready, store as pending and we will process it later
+    if (nav == null) {
+      debugPrint('NOTIFICATION_SERVICE: Navigator not ready, storing as pending: $type');
+      _pendingPayload = finalData;
+      return;
+    }
+
+    if (_isNavigationInProgress) return;
+    _isNavigationInProgress = true;
+
+    try {
+      debugPrint('NOTIFICATION_SERVICE: Executing navigation for type: $type');
+      
+      // Support both old string format and new backend format
+      if (type == 'new_order' || finalData['payload'] == 'available_orders' || type == 'available_orders') {
+        await nav.pushNamed('/available-orders');
+      } else if (type == 'chat_message' || type.startsWith('chat_')) {
+        await nav.pushNamed('/chats');
+      } else if (type == 'my_orders') {
+        await nav.pushNamed('/my-orders');
+      }
+    } finally {
+      // Small cooldown to prevent double transitions
+      await Future.delayed(const Duration(milliseconds: 500));
+      _isNavigationInProgress = false;
+      _pendingPayload = null; // Clear queue after success
+    }
+  }
+
+  /// Called when the Navigator is definitely ready (e.g. from HomeScreen or the main builder)
+  Future<void> processPendingNavigation() async {
+    if (_pendingPayload != null) {
+      debugPrint('NOTIFICATION_SERVICE: Processing pending navigation...');
+      await handlePayload(_pendingPayload);
+    }
+  }
+
   Future<void> showNotification({
     required int id,
     required String title,
     required String body,
-    String? payload,
+    Map<String, dynamic>? data,
   }) async {
     if (kIsWeb) return; // Skip on Web
 
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+    final String? payload = data != null ? json.encode(data) : null;
+    final AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
       'yaqin_orders_channel',
       'Yaqin Order Notifications',
@@ -110,7 +233,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+    final NotificationDetails platformChannelSpecifics = NotificationDetails(
       android: androidPlatformChannelSpecifics,
       iOS: darwinPlatformChannelSpecifics,
     );

@@ -11,3 +11,4 @@ aiofiles==24.1.0
 alembic==1.13.2
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
+firebase-admin==6.5.0

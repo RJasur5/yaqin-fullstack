@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/theme.dart';
 import '../config/localization.dart';
 import '../services/auth_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../services/notification_service.dart';
 
 class SplashScreen extends StatefulWidget {
   final AuthService authService;
@@ -53,6 +55,8 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (widget.authService.token != null) {
+      // Always replace with home. 
+      // NotificationService queue will handle the rest automatically once Home is ready.
       Navigator.pushReplacementNamed(context, '/home');
     } else {
       // Check if language was already selected

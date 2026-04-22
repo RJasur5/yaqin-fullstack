@@ -1,4 +1,4 @@
-package com.findix.findix_app
+package com.yaqin.findix
 
 import io.flutter.embedding.android.FlutterActivity
 

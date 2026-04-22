@@ -17,6 +17,8 @@ class AuthService {
 
   AuthService(this.api);
 
+  int? get userId => currentUser?.id;
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     token = prefs.getString(_tokenKey);
@@ -113,6 +115,16 @@ class AuthService {
     } catch (e) {
       debugPrint('Error refreshing user: $e');
       return currentUser;
+    }
+  }
+
+  Future<void> updateFCMToken(String fcmToken) async {
+    if (token == null) return;
+    try {
+      await api.updateFCMToken(fcmToken);
+      debugPrint('AuthService: FCM Token updated successfully');
+    } catch (e) {
+      debugPrint('AuthService: Failed to update FCM token on backend: $e');
     }
   }
 

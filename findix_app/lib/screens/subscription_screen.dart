@@ -5,6 +5,7 @@ import '../config/localization.dart';
 import '../services/api_service.dart';
 import '../models/subscription.dart';
 import '../widgets/gradient_button.dart';
+import 'card_payment_screen.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   final ApiService apiService;
@@ -54,6 +55,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _buildTrialPromo(),
+                    const SizedBox(height: 20),
                     if (_sub != null) _buildCurrentStatus(_sub!),
                     const SizedBox(height: 32),
                     Text(
@@ -61,11 +64,25 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 16),
-                    // Show based on role
-                    if (_sub?.userRole == 'master' || _sub?.userRole == 'admin')
-                      ..._buildWorkerTiers()
-                    else
-                      ..._buildEmployerTiers(),
+                    // Worker tiers
+                    Text(
+                      isRu ? '👷 Иш олувчи (Работник)' : '👷 Ish oluvchi (Ishchi)',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    _tierCard('day', '1 День', '5,000 Сум', '1 Объявление', Icons.bolt_rounded, 5000),
+                    _tierCard('week', '1 Неделя', '30,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded, 30000),
+                    _tierCard('month', '1 Месяц', '150,000 Сум', '45 Объявлений', Icons.star_rounded, 150000, isBest: true),
+                    const SizedBox(height: 24),
+                    // Employer tiers
+                    Text(
+                      isRu ? '💼 Иш берувчи (Работодатель)' : '💼 Ish beruvchi (Ish beruvchi)',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    _tierCard('day', '1 День', '20,000 Сум', '1 Объявление', Icons.bolt_rounded, 20000),
+                    _tierCard('week', '1 Неделя', '150,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded, 150000),
+                    _tierCard('month', '1 Месяц', '300,000 Сум', '30 Объявлений', Icons.star_rounded, 300000, isBest: true),
                     
                     const SizedBox(height: 32),
                     _buildPaymentInfo(),
@@ -73,6 +90,42 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ],
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildTrialPromo() {
+    final isRu = AppStrings.isRu;
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF00C853), Color(0xFF00E676)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: const Color(0xFF00C853).withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 8))],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.card_giftcard_rounded, color: Colors.white, size: 40),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isRu ? '🎉 АКЦИЯ!' : '🎉 AKSIYA!',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  isRu ? 'Первые 2 минуты — БЕСПЛАТНО!\nПосле регистрации вы получаете полный доступ.' : 'Birinchi 2 daqiqa — BEPUL!\nRo\'yxatdan o\'tganingizdan keyin to\'liq kirish.',
+                  style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -138,55 +191,51 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  List<Widget> _buildWorkerTiers() {
-    return [
-      _tierCard('1 День', '5,000 Сум', '1 Объявление', Icons.bolt_rounded),
-      _tierCard('1 Неделя', '30,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded),
-      _tierCard('1 Месяц', '150,000 Сум', '45 Объявлений', Icons.star_rounded, isBest: true),
-    ];
-  }
-
-  List<Widget> _buildEmployerTiers() {
-    return [
-      _tierCard('1 День', '20,000 Сум', '1 Объявление', Icons.bolt_rounded),
-      _tierCard('1 Неделя', '150,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded),
-      _tierCard('1 Месяц', '300,000 Сум', '30 Объявлений', Icons.star_rounded, isBest: true),
-    ];
-  }
-
-  Widget _tierCard(String title, String price, String limit, IconData icon, {bool isBest = false}) {
+  Widget _tierCard(String planId, String title, String price, String limit, IconData icon, int priceVal, {bool isBest = false}) {
     final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: isBest ? AppColors.primary : theme.dividerColor.withOpacity(0.1), width: isBest ? 2 : 1),
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: (isBest ? AppColors.primary : theme.primaryColor).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: isBest ? AppColors.primary : theme.primaryColor),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: (isBest ? AppColors.primary : theme.primaryColor).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(14),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 4),
-                Text(limit, style: theme.textTheme.bodySmall),
-              ],
+          child: Icon(icon, color: isBest ? AppColors.primary : theme.primaryColor),
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        subtitle: Text(limit, style: theme.textTheme.bodySmall),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(price, style: TextStyle(fontWeight: FontWeight.w900, color: isBest ? AppColors.primary : theme.textTheme.bodyLarge?.color, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(AppStrings.isRu ? 'Купить' : 'Sotib olish', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => CardPaymentScreen(
+                apiService: widget.apiService,
+                planName: planId,
+                price: priceVal,
+              ),
             ),
-          ),
-          Text(price, style: TextStyle(fontWeight: FontWeight.w900, color: isBest ? AppColors.primary : theme.textTheme.bodyLarge?.color, fontSize: 16)),
-        ],
+          );
+          if (result == true) {
+            _loadSubscription();
+          }
+        },
       ),
     );
   }
@@ -198,33 +247,27 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.1),
+        color: AppColors.primary.withOpacity(0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
       ),
       child: Column(
         children: [
-          const Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 32),
-          const SizedBox(height: 12),
-          Text(
-            isRu ? 'Как активировать?' : 'Qanday faollashtirish kerak?',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: AppColors.warning),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.network('https://upload.wikimedia.org/wikipedia/commons/b/b5/Payme_logo.png', height: 24, errorBuilder: (_,__,___) => const SizedBox()),
+              const SizedBox(width: 12),
+              Image.network('https://click.uz/static/img/logo.png', height: 24, errorBuilder: (_,__,___) => const SizedBox()),
+            ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Text(
             isRu 
-              ? 'На данный момент активация происходит вручную. Пожалуйста, свяжитесь с администрацией для оплаты и активации тарифа.' 
-              : 'Hozirda faollashtirish qo\'lda amalga oshiriladi. To\'lov va tarifni faollashtirish uchun ma\'muriyat bilan bog\'laning.',
+              ? 'Выберите подходящий тариф и оплатите онлайн любой картой Узбекистана (Uzcard/Humo).' 
+              : 'Mos tarifni tanlang va har qanday O\'zbekiston kartasi (Uzcard/Humo) orqali onlayn to\'lang.',
             textAlign: TextAlign.center,
-            style: TextStyle(height: 1.5, color: theme.textTheme.bodyMedium?.color),
-          ),
-          const SizedBox(height: 20),
-          GradientButton(
-            text: isRu ? 'Связаться с Администратором' : 'Admin bilan bog\'lanish',
-            onPressed: () {
-              // Open Link/Telegram (can use url_launcher later)
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Telegram: @yaqin_admin')));
-            },
+            style: TextStyle(fontSize: 13, color: theme.hintColor),
           ),
         ],
       ),

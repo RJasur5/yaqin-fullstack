@@ -54,6 +54,19 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadData();
     _checkUser();
+    
+    // Fallback: check for notifications again after Home is mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _processPendingNotifications();
+    });
+  }
+
+  void _processPendingNotifications() async {
+    // Small delay to allow transition animations to finish
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      NotificationService.instance.processPendingNavigation();
+    }
   }
 
   void _checkUser() {
