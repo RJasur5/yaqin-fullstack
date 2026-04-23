@@ -174,19 +174,31 @@ class NotificationService {
       return;
     }
 
-    if (_isNavigationInProgress) return;
+    if (_isNavigationInProgress) {
+      debugPrint('NOTIFICATION_SERVICE: Navigation already in progress, queuing payload');
+      _pendingPayload = finalData;
+      return;
+    }
+    
     _isNavigationInProgress = true;
 
     try {
       debugPrint('NOTIFICATION_SERVICE: Executing navigation for type: $type');
       
+      // Delay slightly to ensure any current transitions are finished
+      await Future.delayed(const Duration(milliseconds: 300));
+      
       // Support both old string format and new backend format
-      if (type == 'new_order' || finalData['payload'] == 'available_orders' || type == 'available_orders') {
+      if (type == 'new_order' || type == 'available_orders' || finalData['payload'] == 'available_orders') {
         await nav.pushNamed('/available-orders');
       } else if (type == 'chat_message' || type.startsWith('chat_')) {
+        // If we have order data, we could potentially go to the specific chat, 
+        // but for now, we go to the chat list to be safe.
         await nav.pushNamed('/chats');
-      } else if (type == 'my_orders') {
+      } else if (type == 'my_orders' || type == 'order_accepted' || type == 'order_completed') {
         await nav.pushNamed('/my-orders');
+      } else {
+        debugPrint('NOTIFICATION_SERVICE: No specific navigation for type: $type');
       }
     } finally {
       // Small cooldown to prevent double transitions
@@ -197,9 +209,21 @@ class NotificationService {
   }
 
   /// Called when the Navigator is definitely ready (e.g. from HomeScreen or the main builder)
-  Future<void> processPendingNavigation() async {
+  Future<void> processPendingNavigation({int retryCount = 0}) async {
     if (_pendingPayload != null) {
-      debugPrint('NOTIFICATION_SERVICE: Processing pending navigation...');
+      debugPrint('NOTIFICATION_SERVICE: Processing pending navigation (Attempt ${retryCount + 1})...');
+      
+      if (YaqinApp.navigatorKey.currentState == null) {
+        if (retryCount < 5) {
+          debugPrint('NOTIFICATION_SERVICE: Navigator still not ready, retrying in 500ms...');
+          await Future.delayed(const Duration(milliseconds: 500));
+          return processPendingNavigation(retryCount: retryCount + 1);
+        } else {
+          debugPrint('NOTIFICATION_SERVICE: Navigator failed to initialize after 5 retries.');
+          return;
+        }
+      }
+      
       await handlePayload(_pendingPayload);
     }
   }

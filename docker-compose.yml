@@ -23,6 +23,8 @@ services:
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/findix.db:/app/findix.db
+    ports:
+      - "8005:8000"
     depends_on:
       - db
     networks:

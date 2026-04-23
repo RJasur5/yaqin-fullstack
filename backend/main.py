@@ -27,22 +27,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# --- DIAGNOSTIC MIDDLEWARE ---
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start_time = time.time()
-    path = request.url.path
-    method = request.method
-    
-    # "Shout" in console about every request
-    logging.info(f"==> REQUEST: {method} {path} from {request.client.host if request.client else 'unknown'}")
-    
-    response = await call_next(request)
-    
-    process_time = (time.time() - start_time) * 1000
-    logging.info(f"<== RESPONSE: {response.status_code} (took {process_time:.2f}ms)")
-    
-    return response
+
 
 # --- DEBUG ROUTES ---
 @app.get("/api/test-notify/{user_id}")

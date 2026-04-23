@@ -313,18 +313,16 @@ async def accept_order(
     background_tasks.add_task(complete_order_after_delay, order.id)
     
     # --- INSTANT NOTIFICATION TO CLIENT ---
-    try:
-        await notification_manager.send_notification(
-            order.client_id, "order_accepted",
-            {
-                "order_id": order.id,
-                "master_name": order.master.user.name or order.master.user.phone,
-                "subcategory_name_ru": order.subcategory.name_ru,
-                "subcategory_name_uz": order.subcategory.name_uz,
-            }
-        )
-    except Exception as e:
-        print(f"NOTIFY ERROR in acceptance: {e}")
+    background_tasks.add_task(
+        notification_manager.send_notification,
+        order.client_id, "order_accepted",
+        {
+            "order_id": order.id,
+            "master_name": order.master.user.name or order.master.user.phone,
+            "subcategory_name_ru": order.subcategory.name_ru,
+            "subcategory_name_uz": order.subcategory.name_uz,
+        }
+    )
     # ------------------------------
     return build_order_response(order, is_subscribed=True)
 
@@ -635,25 +633,23 @@ async def send_chat_message(
     
     recipient_id = order.master.user_id if is_client else order.client_id
     
-    # Notify recipient INSTANTLY
-    try:
-        # Ensure aware UTC before isoformat
-        msg_created_at = msg.created_at
-        if msg_created_at and msg_created_at.tzinfo is None:
-            msg_created_at = msg_created_at.replace(tzinfo=timezone.utc)
+    # Notify recipient in BACKGROUND to keep chat snappy
+    # Ensure aware UTC before isoformat
+    msg_created_at = msg.created_at
+    if msg_created_at and msg_created_at.tzinfo is None:
+        msg_created_at = msg_created_at.replace(tzinfo=timezone.utc)
 
-        await notification_manager.send_notification(
-            recipient_id, "chat_message",
-            {
-                "order_id": order.id,
-                "sender_id": user.id,
-                "sender_name": user.name,
-                "text": data.text,
-                "created_at": msg_created_at.isoformat()
-            }
-        )
-    except Exception as e:
-        print(f"NOTIFY ERROR in chat: {e}")
+    background_tasks.add_task(
+        notification_manager.send_notification,
+        recipient_id, "chat_message",
+        {
+            "order_id": order.id,
+            "sender_id": user.id,
+            "sender_name": user.name,
+            "text": data.text,
+            "created_at": msg_created_at.isoformat()
+        }
+    )
     
     return msg
 
