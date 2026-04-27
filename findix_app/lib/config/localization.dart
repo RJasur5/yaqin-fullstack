@@ -61,13 +61,29 @@ class AppStrings {
   static String get hourlyRate => isRu ? 'Ставка' : "To'lov";
   static String get available => isRu ? 'Доступен' : 'Mavjud';
   static String get unavailable => isRu ? 'Занят' : 'Band';
-  static String get call => isRu ? 'Позвонить' : "Qo'ng'iroq qilish";
+  static String get call => isRu ? 'Оставить заявку' : 'Ariza qoldirish';
   static String get writeReview => isRu ? 'Написать отзыв' : 'Sharh yozish';
   static String get filter => isRu ? 'Фильтр' : 'Filtr';
   static String get sortBy => isRu ? 'Сортировка' : 'Saralash';
   static String get byRating => isRu ? 'По рейтингу' : "Reyting bo'yicha";
   static String get byExperience => isRu ? 'По опыту' : "Tajriba bo'yicha";
   static String get byPrice => isRu ? 'По цене' : "Narx bo'yicha";
+
+  // Job Applications
+  static String get submitApplication => isRu ? 'Оставить заявку' : 'Ariza qoldirish';
+  static String get applicationSent => isRu ? 'Заявка отправлена!' : 'Ariza yuborildi!';
+  static String get applicationDescription => isRu ? 'Опишите работу...' : 'Ishni tavsiflang...';
+  static String get applicationPhone => isRu ? 'Ваш телефон для связи' : 'Aloqa uchun telefon';
+  static String get jobApplications => isRu ? 'Заявки на работу' : 'Ish arizalari';
+  static String get noApplications => isRu ? 'Нет заявок' : "Arizalar yo'q";
+  static String get applicationPending => isRu ? 'Ожидает' : 'Kutilmoqda';
+  static String get applicationViewed => isRu ? 'Просмотрена' : "Ko'rildi";
+  static String get applicationAccepted => isRu ? 'Принята' : 'Qabul qilindi';
+  static String get applicationRejected => isRu ? 'Отклонена' : 'Rad etildi';
+  static String get withdraw => isRu ? 'Отозвать' : 'Qaytarib olish';
+  static String get cancelOrder => isRu ? 'Отменить заказ' : 'Buyurtmani bekor qilish';
+  static String get reject => isRu ? 'Отказать' : 'Rad etish';
+
 
   // Profile
   static String get profile => isRu ? 'Профиль' : 'Profil';

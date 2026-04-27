@@ -1,42 +1,41 @@
 import paramiko
-import time
 
-def deploy():
-    host = "95.182.118.245"
-    user = "yaqingo"
+def finalize_persistence():
+    hostname = "95.182.118.245"
+    username = "yaqingo"
     password = "nEQvV9Pi8e"
     
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
-    print(f"Connecting to {host}...")
-    ssh.connect(host, username=user, password=password)
-    
-    commands = [
-        "cd yaqin-fullstack || cd findix-fullstack || cd *fullstack || ls", # Try to find the dir
-        "git pull origin master",
-        "sudo docker-compose up -d --build"
-    ]
-    
-    for cmd in commands:
-        print(f"Running: {cmd}")
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        
-        # If sudo asks for password
-        if "sudo" in cmd:
-            stdin.write(password + "\n")
-            stdin.flush()
-            
-        exit_status = stdout.channel.recv_exit_status()
-        print(f"STDOUT: {stdout.read().decode()}")
-        print(f"STDERR: {stderr.read().decode()}")
-        print(f"Status: {exit_status}")
-    
-    ssh.close()
-    print("Deployment finished.")
-
-if __name__ == "__main__":
     try:
-        deploy()
+        client.connect(hostname, username=username, password=password)
+        print("Connected. Finalizing persistence...")
+        
+        project_dir = "/home/yaqingo/project"
+        
+        # 1. Pull the new docker-compose.yml
+        print("Pulling latest config from GitHub...")
+        stdin, stdout, stderr = client.exec_command(f"cd {project_dir} && git pull origin main")
+        print(stdout.read().decode())
+        print(stderr.read().decode())
+        
+        # 2. Restart everything to apply the volume mapping
+        print("Executing docker compose down && docker compose up -d...")
+        # Note: We use -d to run in background. We already backed up findix.db to the host.
+        # Now volume mapping (- ./backend/findix.db:/app/findix.db) will use that host file.
+        stdin, stdout, stderr = client.exec_command(f"cd {project_dir} && docker compose down && docker compose up -d")
+        print(stdout.read().decode())
+        print(stderr.read().decode())
+        
+        print("\nFinal status check:")
+        stdin, stdout, stderr = client.exec_command("docker ps")
+        print(stdout.read().decode())
+
     except Exception as e:
         print(f"Error: {e}")
+    finally:
+        client.close()
+
+if __name__ == "__main__":
+    finalize_persistence()

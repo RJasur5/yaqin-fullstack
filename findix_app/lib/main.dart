@@ -184,7 +184,7 @@ class YaqinApp extends StatelessWidget {
             '/register': (context) => RegisterScreen(authService: authService),
             '/home': (context) => HomeScreen(apiService: apiService, authService: authService),
             '/create-order': (context) => CreateOrderScreen(apiService: apiService, authService: authService),
-            '/available-orders': (context) => AvailableOrdersScreen(apiService: apiService),
+            '/available-orders': (context) => AvailableOrdersScreen(apiService: apiService, authService: authService),
             '/my-orders': (context) => MyOrdersScreen(apiService: apiService, authService: authService),
             '/accepted-orders': (context) => AcceptedOrdersScreen(apiService: apiService, authService: authService),
             '/onboarding': (context) => const OnboardingScreen(),

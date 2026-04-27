@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, timezone
+from utils.phone_formatter import format_phone
 
 
 # ==================== AUTH ====================
@@ -13,10 +14,20 @@ class UserRegister(BaseModel):
     city: Optional[str] = None
     lang: str = "ru"
 
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        return format_phone(v)
+
 
 class UserLogin(BaseModel):
     phone: str
     password: str
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: str) -> str:
+        return format_phone(v)
 
 class FCMTokenUpdate(BaseModel):
     fcm_token: str
@@ -45,6 +56,11 @@ class UserResponse(BaseModel):
         if v and v.tzinfo is None:
             return v.replace(tzinfo=timezone.utc)
         return v
+
+    @field_validator("phone", mode="after")
+    @classmethod
+    def format_phone_response(cls, v: str) -> str:
+        return format_phone(v)
 
 
 class TokenResponse(BaseModel):
@@ -250,7 +266,6 @@ class ChatSummaryResponse(BaseModel):
 
 
 # ==================== ORDER ====================
-
 class OrderCreate(BaseModel):
     subcategory_id: int
     description: str
@@ -259,6 +274,8 @@ class OrderCreate(BaseModel):
     price: Optional[float] = None
     include_lunch: bool = False
     include_taxi: bool = False
+    is_company: bool = False
+
 
 
 class OrderResponse(BaseModel):
@@ -286,6 +303,10 @@ class OrderResponse(BaseModel):
     include_lunch: bool = False
     include_taxi: bool = False
     can_chat: bool = True # New field for masking logic
+    is_application: bool = False
+    is_company: bool = False
+    applicants_count: int = 0
+    my_role: Optional[str] = None  # "employer" or "worker" — tells the client who THEY are in this order
 
     class Config:
         from_attributes = True
@@ -297,12 +318,24 @@ class OrderResponse(BaseModel):
             return v.replace(tzinfo=timezone.utc)
         return v
 
+    @field_validator("client_phone", mode="after")
+    @classmethod
+    def format_client_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None: return v
+        return format_phone(v)
+
 # ==================== ADMIN ====================
 
 class AdminUserUpdate(BaseModel):
     name: Optional[str] = None
     phone: Optional[str] = None
     role: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None: return v
+        return format_phone(v)
     city: Optional[str] = None
     lang: Optional[str] = None
     is_blocked: Optional[bool] = None
@@ -350,6 +383,52 @@ class AppReviewResponse(BaseModel):
         if v and v.tzinfo is None:
             return v.replace(tzinfo=timezone.utc)
         return v
+
+# ==================== JOB APPLICATIONS ====================
+
+class JobApplicationCreate(BaseModel):
+    description: str = Field(..., min_length=5)
+    city: Optional[str] = None
+    phone: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
+        if v is None: return v
+        return format_phone(v)
+
+class JobApplicationResponse(BaseModel):
+    id: int
+    employer_id: int
+    employer_name: str
+    employer_phone: Optional[str] = None
+    employer_avatar: Optional[str] = None
+    master_id: int
+    master_name: str
+    description: str
+    city: Optional[str] = None
+    phone: Optional[str] = None
+    status: str = "pending"
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+    @field_validator("created_at", mode="after")
+    @classmethod
+    def ensure_tz(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v and v.tzinfo is None:
+            return v.replace(tzinfo=timezone.utc)
+        return v
+
+    @field_validator("employer_phone", "phone", mode="after")
+    @classmethod
+    def format_app_phones(cls, v: Optional[str]) -> Optional[str]:
+        if v is None: return v
+        return format_phone(v)
+
+class JobApplicationStatusUpdate(BaseModel):
+    status: str  # "viewed", "accepted", "rejected"
 
 # ==================== SUBSCRIPTION ====================
 

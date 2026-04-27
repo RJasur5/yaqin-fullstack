@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/gradient_button.dart';
 import '../../widgets/rating_stars.dart';
 import '../../utils/date_utils.dart';
+import '../../utils/formatters.dart';
 import 'chat_screen.dart';
 
 class AcceptedOrdersScreen extends StatefulWidget {
@@ -98,6 +99,7 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
     
     Color statusColor = Colors.orange;
     String statusText = AppStrings.isRu ? 'Открыто' : 'Ochiq';
+    final bool isApp = order['is_application'] == true;
     
     if (status == 'accepted') {
       statusColor = Colors.blue;
@@ -105,6 +107,15 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
     } else if (status == 'completed') {
       statusColor = Colors.green;
       statusText = AppStrings.isRu ? 'Завершено' : 'Tugallangan';
+    } else if (status == 'rejected') {
+      statusColor = Colors.red;
+      statusText = AppStrings.isRu ? 'Отказано' : 'Rad etilgan';
+    } else if (status == 'pending') {
+      statusColor = Colors.amber;
+      statusText = AppStrings.isRu ? 'Ожидание' : 'Kutilmoqda';
+    } else if (status == 'viewed') {
+      statusColor = Colors.cyan;
+      statusText = AppStrings.isRu ? 'Просмотрено' : 'Ko\'rilgan';
     }
 
     return Container(
@@ -112,13 +123,29 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.1)),
+        border: Border.all(
+          color: isApp ? statusColor.withOpacity(0.3) : theme.dividerColor.withOpacity(0.1),
+          width: isApp ? 2 : 1,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (isApp)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  AppStrings.isRu ? 'ЗАЯВКА' : 'ARIZA',
+                  style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -151,6 +178,13 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
               order['description'],
               style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
             ),
+            if (order['price'] != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${PriceFormatter.format(order['price'])} ${AppStrings.sum}',
+                style: TextStyle(color: theme.textTheme.titleLarge?.color, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+            ],
             const SizedBox(height: 16),
             Divider(color: theme.dividerColor.withOpacity(0.1)),
             const SizedBox(height: 8),
@@ -164,7 +198,7 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
                  ),
                  const Spacer(),
                  Text(
-                   order['client_phone'],
+                   order['client_phone'] != null ? PriceFormatter.formatPhone(order['client_phone']) : '',
                    style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold),
                  ),
               ],

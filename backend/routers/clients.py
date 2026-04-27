@@ -16,7 +16,7 @@ def get_client_profile(
     try:
         user = get_current_user_from_header(authorization, db)
         from routers.orders import check_subscription
-        is_subscribed = check_subscription(user.id, db)
+        is_subscribed = check_subscription(user.id, "master", db)
     except:
         is_subscribed = False
 

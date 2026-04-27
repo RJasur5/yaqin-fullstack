@@ -12,12 +12,14 @@ class CardPaymentScreen extends StatefulWidget {
   final ApiService apiService;
   final String planName;
   final int price;
+  final String role;
 
   const CardPaymentScreen({
     super.key,
     required this.apiService,
     required this.planName,
     required this.price,
+    required this.role,
   });
 
   @override

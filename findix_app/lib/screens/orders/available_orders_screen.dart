@@ -12,12 +12,17 @@ import '../../widgets/rating_stars.dart';
 import '../../config/api_config.dart';
 import '../../widgets/full_screen_image.dart';
 import '../../utils/date_utils.dart';
+import '../../utils/formatters.dart';
+import '../../services/auth_service.dart';
+import '../../models/order.dart';
+import 'chat_screen.dart';
 
 class AvailableOrdersScreen extends StatefulWidget {
   final ApiService apiService;
+  final AuthService authService;
   final List<CategoryModel> categories;
   final int? initialCategoryId;
-  const AvailableOrdersScreen({super.key, required this.apiService, this.categories = const [], this.initialCategoryId});
+  const AvailableOrdersScreen({super.key, required this.apiService, required this.authService, this.categories = const [], this.initialCategoryId});
 
   @override
   State<AvailableOrdersScreen> createState() => _AvailableOrdersScreenState();
@@ -75,8 +80,20 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
 
   Future<void> _acceptOrder(int orderId) async {
     try {
-      await widget.apiService.acceptOrder(orderId);
+      final res = await widget.apiService.acceptOrder(orderId);
+      
       if (mounted) {
+        // Navigate to Chat
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              order: res,
+              apiService: widget.apiService,
+              currentUserId: widget.authService.currentUser?.id ?? 0,
+            ),
+          ),
+        );
         _loadOrders();
       }
     } catch (e) {
@@ -513,6 +530,36 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
                 ),
               ],
             ),
+            if (order['is_company'] == true) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.purple.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.purple.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.groups_rounded, color: Colors.purple, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      AppStrings.isRu ? 'Набор персонала (HR)' : 'Xodimlar yollash (HR)',
+                      style: const TextStyle(color: Colors.purple, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 4),
+              Text(
+                AppStrings.isRu 
+                  ? 'Уже откликнулось: ${order['applicants_count']} чел.' 
+                  : 'Allaqachon ${order['applicants_count']} kishi murojaat qildi',
+                style: TextStyle(color: theme.primaryColor.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+            ],
             const SizedBox(height: 8),
             Row(
               children: [
@@ -622,7 +669,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               children: [
                 if (order['price'] != null) ...[
                   Text(
-                    '${order['price'].toStringAsFixed(0)} ${AppStrings.sum}',
+                    '${PriceFormatter.format(order['price'])} ${AppStrings.sum}',
                     style: TextStyle(color: theme.textTheme.titleLarge?.color, fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const Spacer(),

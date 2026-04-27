@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/localization.dart';
 import '../config/api_config.dart';
@@ -9,6 +8,8 @@ import '../services/theme_service.dart';
 import '../widgets/rating_stars.dart';
 import '../widgets/gradient_button.dart';
 import '../widgets/full_screen_image.dart';
+import '../utils/phone_utils.dart';
+import '../utils/formatters.dart';
 
 class MasterDetailScreen extends StatefulWidget {
   final ApiService apiService;
@@ -110,20 +111,207 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
     );
   }
 
-  void _showSubscriptionRequired() {
+  void _showJobApplicationDialog() {
+    final theme = Theme.of(context);
+    final descController = TextEditingController();
+    final phoneController = TextEditingController();
+    final _phoneFormatter = PhoneUtils.maskFormatter;
+    final cityController = TextEditingController();
+    bool isSending = false;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.cardTheme.color,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Drag handle
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.textTheme.bodySmall?.color?.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Header with icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.1),
+                      AppColors.secondary.withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.work_outline_rounded, color: AppColors.primary, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            AppStrings.submitApplication,
+                            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _master?.userName ?? '',
+                            style: const TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Description field
+              TextField(
+                controller: descController,
+                maxLines: 4,
+                style: theme.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: AppStrings.applicationDescription,
+                  labelText: AppStrings.isRu ? 'Описание работы *' : 'Ish tavsifi *',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  prefixIcon: const Icon(Icons.description_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // City field
+              TextField(
+                controller: cityController,
+                style: theme.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: AppStrings.isRu ? 'Город' : 'Shahar',
+                  labelText: AppStrings.city,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  prefixIcon: const Icon(Icons.location_on_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Phone field
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [_phoneFormatter],
+                style: theme.textTheme.bodyLarge,
+                decoration: InputDecoration(
+                  hintText: '+998 (99) 858-56-88',
+                  labelText: AppStrings.applicationPhone,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  prefixIcon: const Icon(Icons.phone_rounded),
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Submit button
+              GradientButton(
+                text: isSending
+                    ? (AppStrings.isRu ? 'Отправка...' : 'Yuborilmoqda...')
+                    : AppStrings.submitApplication,
+                icon: Icons.send_rounded,
+                onPressed: isSending ? null : () async {
+                  if (descController.text.trim().length < 5) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(AppStrings.isRu
+                          ? 'Опишите работу (минимум 5 символов)'
+                          : 'Ishni tavsiflang (kamida 5 belgi)')),
+                    );
+                    return;
+                  }
+                  setModalState(() => isSending = true);
+                  try {
+                    await widget.apiService.createJobApplication(
+                      widget.masterId,
+                      description: descController.text.trim(),
+                      city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : null,
+                      phone: phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : null,
+                    );
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      _showApplicationSentSuccess();
+                    }
+                  } catch (e) {
+                    setModalState(() => isSending = false);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showApplicationSentSuccess() {
     final theme = Theme.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: theme.cardTheme.color,
-        title: Text(AppStrings.isRu ? "Требуется подписка" : "Obuna talab qilinadi"),
-        content: Text(AppStrings.isRu 
-          ? "Для просмотра контактов и связи с мастером необходима активная подписка." 
-          : "Kontaktlarni ko'rish va usta bilan bog'lanish uchun faol obuna bo'lishi kerak."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.success.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 64),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              AppStrings.applicationSent,
+              style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              AppStrings.isRu
+                  ? 'Мастер получит уведомление о вашей заявке и свяжется с вами.'
+                  : "Usta sizning arizangiz haqida bildirishnoma oladi va siz bilan bog'lanadi.",
+              style: theme.textTheme.bodyMedium,
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(AppStrings.isRu ? "Понятно" : "Tushunarli"),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'OK',
+                style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
         ],
       ),
@@ -227,7 +415,7 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                                                 )
                                               : null,
                                         ),
-                                        child: _master!.userAvatar == null 
+                                        child: _master!.userAvatar == null
                                           ? Center(
                                               child: Text(
                                                 _master!.initials,
@@ -331,7 +519,7 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                               if (_master!.city != null)
                                 _infoRow(Icons.location_on_rounded, '${AppStrings.city}: ${_master!.city!}'),
                               if (_master!.hourlyRate != null)
-                                _infoRow(Icons.payments_rounded, '${AppStrings.hourlyRate}: ${_master!.hourlyRate!.toStringAsFixed(0)} ${AppStrings.sum}'),
+                                _infoRow(Icons.payments_rounded, '${AppStrings.hourlyRate}: ${PriceFormatter.format(_master!.hourlyRate)} ${AppStrings.sum}'),
                               _infoRow(Icons.category_rounded, '${_master!.categoryName(AppStrings.lang)} → ${_master!.subcategoryName(AppStrings.lang)}'),
 
                               // Skills
@@ -413,18 +601,9 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                 children: [
                   Expanded(
                     child: GradientButton(
-                      text: AppStrings.call,
-                      icon: Icons.phone_rounded,
-                      onPressed: () async {
-                        if (!_master!.canContact) {
-                          _showSubscriptionRequired();
-                          return;
-                        }
-                        if (_master!.phone != null) {
-                          final uri = Uri.parse('tel:${_master!.phone}');
-                          if (await canLaunchUrl(uri)) launchUrl(uri);
-                        }
-                      },
+                      text: AppStrings.submitApplication,
+                      icon: Icons.work_outline_rounded,
+                      onPressed: _showJobApplicationDialog,
                     ),
                   ),
                   const SizedBox(width: 12),

@@ -33,3 +33,10 @@ ngrok.log
 # OS related
 .DS_Store
 Thumbs.db
+
+# Secrets
+backend/*.json
+findix_app/android/app/google-services.json
+findix_app/ios/Runner/GoogleService-Info.plist
+*.p12
+*.jks

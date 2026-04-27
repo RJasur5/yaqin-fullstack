@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../config/theme.dart';
 import '../config/localization.dart';
 import '../services/api_service.dart';
 import '../models/subscription.dart';
 import '../widgets/gradient_button.dart';
 import 'card_payment_screen.dart';
+import '../services/auth_service.dart';
+import '../utils/formatters.dart';
 
 class SubscriptionScreen extends StatefulWidget {
   final ApiService apiService;
-  const SubscriptionScreen({super.key, required this.apiService});
+  final AuthService authService;
+  const SubscriptionScreen({super.key, required this.apiService, required this.authService});
 
   @override
   State<SubscriptionScreen> createState() => _SubscriptionScreenState();
@@ -58,6 +62,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     _buildTrialPromo(),
                     const SizedBox(height: 20),
                     if (_sub != null) _buildCurrentStatus(_sub!),
+                    const SizedBox(height: 12),
+                    // Show User ID for manual payment reference
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.badge_rounded, size: 16, color: AppColors.primary),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${isRu ? 'Ваш ID для оплаты' : 'To\'lov uchun ID'}: ',
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                            Text(
+                              '${widget.authService.currentUser?.id ?? ""}',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 32),
                     Text(
                       isRu ? 'Доступные тарифы' : 'Mavjud tariflar',
@@ -70,19 +101,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                       style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    _tierCard('day', '1 День', '5,000 Сум', '1 Объявление', Icons.bolt_rounded, 5000),
-                    _tierCard('week', '1 Неделя', '30,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded, 30000),
-                    _tierCard('month', '1 Месяц', '150,000 Сум', '45 Объявлений', Icons.star_rounded, 150000, isBest: true),
-                    const SizedBox(height: 24),
-                    // Employer tiers
-                    Text(
-                      isRu ? '💼 Иш берувчи (Работодатель)' : '💼 Ish beruvchi (Ish beruvchi)',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    _tierCard('day', '1 День', '20,000 Сум', '1 Объявление', Icons.bolt_rounded, 20000),
-                    _tierCard('week', '1 Неделя', '150,000 Сум', '10 Объявлений', Icons.auto_awesome_rounded, 150000),
-                    _tierCard('month', '1 Месяц', '300,000 Сум', '30 Объявлений', Icons.star_rounded, 300000, isBest: true),
+                    _tierCard('day', isRu ? '1 День' : '1 Kun', '${PriceFormatter.format(5000)} ${AppStrings.sum}', isRu ? '1 Объявление' : '1 e\'lon', Icons.bolt_rounded, 5000, 'master'),
+                    _tierCard('week', isRu ? '1 Неделя' : '1 Hafta', '${PriceFormatter.format(30000)} ${AppStrings.sum}', isRu ? '10 Объявлений' : '10 e\'lon', Icons.auto_awesome_rounded, 30000, 'master'),
+                    _tierCard('month', isRu ? '1 Месяц' : '1 Oy', '${PriceFormatter.format(150000)} ${AppStrings.sum}', isRu ? '45 Объявлений' : '45 e\'lon', Icons.star_rounded, 150000, 'master', isBest: true),
                     
                     const SizedBox(height: 32),
                     _buildPaymentInfo(),
@@ -191,7 +212,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _tierCard(String planId, String title, String price, String limit, IconData icon, int priceVal, {bool isBest = false}) {
+  Widget _tierCard(String planId, String title, String price, String limit, IconData icon, int priceVal, String role, {bool isBest = false}) {
     final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -221,23 +242,148 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             Text(AppStrings.isRu ? 'Купить' : 'Sotib olish', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
           ],
         ),
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => CardPaymentScreen(
-                apiService: widget.apiService,
-                planName: planId,
-                price: priceVal,
-              ),
-            ),
-          );
-          if (result == true) {
-            _loadSubscription();
-          }
+        onTap: () {
+          _showPaymentMethodSheet(planId, priceVal, role);
         },
       ),
     );
+  }
+
+  void _showPaymentMethodSheet(String planId, int priceVal, String role) {
+    final isRu = AppStrings.isRu;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isRu ? 'Выберите способ оплаты' : 'To\'lov usulini tanlang',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 24),
+            _paymentOption(
+              title: isRu ? 'Карта Uzcard/Humo' : 'Uzcard/Humo kartasi',
+              subtitle: isRu ? 'Ввод данных в приложении' : 'Ilova ichida ma\'lumotlarni kiritish',
+              icon: Icons.credit_card_rounded,
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  this.context,
+                  MaterialPageRoute(
+                    builder: (_) => CardPaymentScreen(
+                      apiService: widget.apiService,
+                      planName: planId,
+                      price: priceVal,
+                      role: role,
+                    ),
+                  ),
+                );
+                if (result == true) _loadSubscription();
+              },
+            ),
+            const SizedBox(height: 12),
+            _paymentOption(
+              title: 'Click Up',
+              subtitle: isRu ? 'Переход в приложение Click' : 'Click ilovasiga o\'tish',
+              icon: Icons.account_balance_wallet_rounded,
+              onTap: () async {
+                Navigator.pop(context);
+                _processClickPayment(planId, role);
+              },
+            ),
+            const SizedBox(height: 12),
+            _paymentOption(
+              title: 'Payme',
+              subtitle: isRu ? 'Переход в приложение Payme' : 'Payme ilovasiga o\'tish',
+              icon: Icons.payment_rounded,
+              color: const Color(0xFF00BFA5),
+              onTap: () async {
+                Navigator.pop(context);
+                _processPaymePayment(planId, role);
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _paymentOption({required String title, required String subtitle, required IconData icon, required VoidCallback onTap, Color? color}) {
+    return ListTile(
+      onTap: onTap,
+      leading: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: (color ?? AppColors.primary).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: color ?? AppColors.primary),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.grey.withOpacity(0.1))),
+    );
+  }
+
+  Future<void> _processClickPayment(String planId, String role) async {
+    setState(() => _isLoading = true);
+    try {
+      final url = await widget.apiService.getClickUrl(planId, role: role);
+      final uri = Uri.parse(url);
+      
+      // Try to launch external application directly
+      bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      
+      if (!launched) {
+        // Fallback to in-app webview or internal browser if external fails
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+
+      if (mounted && launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.isRu ? 'Ожидание подтверждения оплаты...' : 'To\'lov tasdiqlanishini kutilmoqda...'))
+        );
+        Future.delayed(const Duration(seconds: 5), () => _loadSubscription());
+      } else if (!launched) {
+        throw 'Could not launch Click URL';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _processPaymePayment(String planId, String role) async {
+    setState(() => _isLoading = true);
+    try {
+      final url = await widget.apiService.getPaymeUrl(planId, role: role);
+      final uri = Uri.parse(url);
+      
+      bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+
+      if (mounted && launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.isRu ? 'Ожидание подтверждения оплаты...' : 'To\'lov tasdiqlanishini kutilmoqda...'))
+        );
+        Future.delayed(const Duration(seconds: 5), () => _loadSubscription());
+      } else if (!launched) {
+        throw 'Could not launch Payme URL';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Widget _buildPaymentInfo() {

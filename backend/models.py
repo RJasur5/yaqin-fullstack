@@ -31,7 +31,8 @@ class User(Base):
     favorites = relationship("Favorite", back_populates="user", cascade="all, delete-orphan")
     orders = relationship("Order", back_populates="client", foreign_keys="Order.client_id", cascade="all, delete-orphan")
     messages_sent = relationship("ChatMessage", back_populates="sender", cascade="all, delete-orphan")
-    subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    subscriptions = relationship("Subscription", back_populates="user", cascade="all, delete-orphan")
+    job_applications_sent = relationship("JobApplication", back_populates="employer", foreign_keys="JobApplication.employer_id", cascade="all, delete-orphan")
 
 
 class Category(Base):
@@ -83,6 +84,7 @@ class MasterProfile(Base):
     reviews = relationship("Review", back_populates="master", foreign_keys="Review.master_id", cascade="all, delete-orphan")
     accepted_orders = relationship("Order", back_populates="master", foreign_keys="Order.master_id", cascade="all, delete-orphan")
     client_reviews_given = relationship("ClientReview", back_populates="master", foreign_keys="ClientReview.master_id", cascade="all, delete-orphan")
+    job_applications_received = relationship("JobApplication", back_populates="master", foreign_keys="JobApplication.master_id", cascade="all, delete-orphan")
 
 
 class Review(Base):
@@ -143,11 +145,28 @@ class Order(Base):
     is_master_reviewed = Column(Boolean, default=False)
     include_lunch = Column(Boolean, default=False)
     include_taxi = Column(Boolean, default=False)
-
+    is_company = Column(Boolean, default=False)
+    
     client = relationship("User", back_populates="orders", foreign_keys=[client_id])
     master = relationship("MasterProfile", back_populates="accepted_orders", foreign_keys=[master_id])
     subcategory = relationship("Subcategory")
     messages = relationship("ChatMessage", back_populates="order", cascade="all, delete-orphan")
+    assignments = relationship("OrderAssignment", back_populates="order", cascade="all, delete-orphan")
+
+class OrderAssignment(Base):
+    """Tracks masters who have accepted an order. 
+    For regular orders, there is only one. 
+    For company orders, there can be many."""
+    __tablename__ = "order_assignments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
+    master_id = Column(Integer, ForeignKey("master_profiles.id"), nullable=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+    order = relationship("Order", back_populates="assignments")
+    master = relationship("MasterProfile")
+
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -179,7 +198,7 @@ class Subscription(Base):
     __tablename__ = "subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     user_role = Column(String(20), nullable=False)  # "master" or "client"
     plan_name = Column(String(50), nullable=False)  # "trial", "day", "week", "month"
     ads_limit = Column(Integer, default=0)
@@ -187,4 +206,39 @@ class Subscription(Base):
     expires_at = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True)
 
-    user = relationship("User", back_populates="subscription")
+    user = relationship("User", back_populates="subscriptions") # Note plural
+
+
+class JobApplication(Base):
+    """Job application from employer to master.
+    Employers submit these instead of calling masters directly."""
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employer_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    master_id = Column(Integer, ForeignKey("master_profiles.id"), nullable=False)
+    description = Column(Text, nullable=False)  # Job description
+    city = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)  # Employer contact phone
+    status = Column(String(20), default="pending")  # pending, viewed, accepted, rejected
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+    employer = relationship("User", back_populates="job_applications_sent", foreign_keys=[employer_id])
+    master = relationship("MasterProfile", back_populates="job_applications_received", foreign_keys=[master_id])
+
+
+class PaymentTransaction(Base):
+    __tablename__ = "payment_transactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    provider = Column(String(20), nullable=False)  # "click" or "payme"
+    provider_trans_id = Column(String(100), nullable=False, unique=True)
+    amount = Column(Float, nullable=False)
+    plan_name = Column(String(50), nullable=False)
+    role = Column(String(20), nullable=False)
+    status = Column(String(20), default="pending")  # pending, success, failed, cancelled
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    completed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")

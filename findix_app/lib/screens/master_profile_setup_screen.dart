@@ -6,6 +6,8 @@ import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/gradient_button.dart';
 import '../models/category.dart';
+import 'package:flutter/services.dart';
+import '../utils/formatters.dart';
 
 class MasterProfileSetupScreen extends StatefulWidget {
   final ApiService apiService;
@@ -158,7 +160,7 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
           subcategoryId: _selectedSubcategoryId!,
           description: _descController.text.trim(),
           experienceYears: int.tryParse(_experienceController.text) ?? 0,
-          hourlyRate: double.tryParse(_hourlyRateController.text),
+          hourlyRate: double.tryParse(_hourlyRateController.text.replaceAll(' ', '')),
           city: _selectedCity,
           district: _selectedDistrict,
           address: addressToSend,
@@ -169,7 +171,7 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
           subcategoryId: _selectedSubcategoryId!,
           description: _descController.text.trim(),
           experienceYears: int.tryParse(_experienceController.text) ?? 0,
-          hourlyRate: double.tryParse(_hourlyRateController.text),
+          hourlyRate: double.tryParse(_hourlyRateController.text.replaceAll(' ', '')),
           city: _selectedCity,
           district: _selectedDistrict,
           address: addressToSend,
@@ -377,6 +379,10 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                     TextField(
                       controller: _experienceController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
                       style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                       decoration: InputDecoration(
                         labelText: AppStrings.isRu ? 'Опыт (в годах)' : 'Tajriba (yillarda)',
@@ -392,6 +398,10 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                     TextField(
                       controller: _hourlyRateController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        ThousandsSeparatorInputFormatter(),
+                      ],
                       style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                       decoration: InputDecoration(
                         labelText: AppStrings.isRu ? 'Ставка в час (сум)' : 'Soatlik to\'lov (so\'m)',

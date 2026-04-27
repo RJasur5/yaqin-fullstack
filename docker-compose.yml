@@ -47,6 +47,14 @@ services:
     networks:
       - findix-network
 
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./deploy/certbot/conf:/etc/letsencrypt
+      - ./deploy/certbot/www:/var/www/certbot
+    networks:
+      - findix-network
+
 volumes:
   postgres_data:
 networks:

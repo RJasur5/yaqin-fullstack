@@ -2,7 +2,7 @@ class ApiConfig {
   static const bool isProduction = true; // Toggle this for server deployment
   
   static const String devUrl = 'http://192.168.88.111:8005';
-  static const String prodUrl = 'http://95.182.118.245';
+  static const String prodUrl = 'https://yaqingo.uz';
   
   static String get baseUrl => isProduction ? prodUrl : devUrl;
   static String get wsBaseUrl => baseUrl.replaceFirst('http', 'ws');

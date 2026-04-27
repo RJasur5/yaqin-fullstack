@@ -153,6 +153,28 @@ class SocketService {
           body: data['text'] ?? '',
           data: {'type': 'chat_${data['order_id']}'},
         );
+      } else if (data['type'] == 'job_application') {
+        _messageController.add(data);
+        NotificationService.instance.showNotification(
+          id: data['application_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: AppStrings.isRu ? '📋 Новая заявка на работу!' : '📋 Yangi ish arizasi!',
+          body: AppStrings.isRu
+            ? '${data['employer_name']} оставил заявку: ${data['description'] ?? ''}'
+            : '${data['employer_name']} ariza qoldirdi: ${data['description'] ?? ''}',
+          data: {'type': 'job_applications'},
+        );
+      } else if (data['type'] == 'job_application_status') {
+        _messageController.add(data);
+        final statusRu = data['status_text_ru'] ?? data['status'];
+        final statusUz = data['status_text_uz'] ?? data['status'];
+        NotificationService.instance.showNotification(
+          id: data['application_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: AppStrings.isRu ? '📝 Статус заявки' : '📝 Ariza holati',
+          body: AppStrings.isRu
+            ? 'Мастер ${data['master_name']}: заявка $statusRu'
+            : 'Usta ${data['master_name']}: ariza $statusUz',
+          data: {'type': 'my_orders'},
+        );
       }
     } catch (e) {
       debugPrint('SOCKET_SERVICE: Error parsing message: $e');

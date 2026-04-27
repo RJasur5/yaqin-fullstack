@@ -309,6 +309,7 @@ class ApiService {
     double? price,
     bool includeLunch = false,
     bool includeTaxi = false,
+    bool isCompany = false,
   }) async {
     final res = await http.post(
       Uri.parse(ApiConfig.orders),
@@ -321,6 +322,7 @@ class ApiService {
         'price': price,
         'include_lunch': includeLunch,
         'include_taxi': includeTaxi,
+        'is_company': isCompany,
       }),
     );
     if (res.statusCode == 200) {
@@ -602,16 +604,16 @@ class ApiService {
 
   // ==================== SUBSCRIPTIONS ====================
 
-  Future<SubscriptionModel> getMySubscription() async {
+  Future<SubscriptionModel> getMySubscription({String role = 'master'}) async {
     final res = await http.get(
-      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/my'),
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/my-status?role=$role'),
       headers: _headers,
     ).timeout(const Duration(seconds: 30));
     
     if (res.statusCode == 200) {
       return SubscriptionModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Failed to load subscription info');
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get subscription');
   }
 
   Future<SubscriptionModel> payWithCard({
@@ -636,4 +638,128 @@ class ApiService {
     }
     throw Exception(jsonDecode(res.body)['detail'] ?? 'Payment failed');
   }
+
+  Future<String> getClickUrl(String planName, {String role = 'master'}) async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/click-url?plan_name=$planName&role=$role'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['url'];
+    }
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get payment URL');
+  }
+
+  Future<String> getPaymeUrl(String planName, {String role = 'master'}) async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/payme-url?plan_name=$planName&role=$role'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['url'];
+    }
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get Payme URL');
+  }
+
+  // ==================== JOB APPLICATIONS ====================
+
+  Future<Map<String, dynamic>> createJobApplication(int masterId, {
+    required String description,
+    String? city,
+    String? phone,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$masterId'),
+      headers: _headers,
+      body: jsonEncode({
+        'description': description,
+        if (city != null) 'city': city,
+        if (phone != null) 'phone': phone,
+      }),
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body);
+    }
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to create application');
+  }
+
+  Future<List<dynamic>> getMyReceivedApplications() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/job-applications/my/received'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as List;
+    }
+    throw Exception('Failed to load applications');
+  }
+
+  Future<List<dynamic>> getMySentApplications() async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/job-applications/my/sent'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as List;
+    }
+    throw Exception('Failed to load applications');
+  }
+
+  Future<void> updateApplicationStatus(int applicationId, String status) async {
+    final res = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$applicationId/status'),
+      headers: _headers,
+      body: jsonEncode({'status': status}),
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to update status');
+    }
+  }
+
+  Future<void> withdrawJobApplication(int applicationId) async {
+    final res = await http.delete(
+      Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$applicationId'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to withdraw application');
+    }
+  }
+
+  Future<void> cancelOrder(int orderId) async {
+    final res = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/cancel'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to cancel order');
+    }
+  }
+
+  Future<void> cancelOthers(int orderId, {int? keepMasterId}) async {
+    var url = '${ApiConfig.baseUrl}/api/orders/$orderId/cancel-others';
+    if (keepMasterId != null) {
+      url += '?keep_master_id=$keepMasterId';
+    }
+    final res = await http.put(
+      Uri.parse(url),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to cancel others');
+    }
+  }
+
+  Future<void> rejectMaster(int orderId) async {
+    final res = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/reject'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to reject master');
+    }
+  }
 }
+

@@ -4,6 +4,7 @@ import '../config/localization.dart';
 import '../config/api_config.dart';
 import '../models/master.dart';
 import 'rating_stars.dart';
+import '../utils/formatters.dart';
 
 class MasterCard extends StatelessWidget {
   final MasterModel master;
@@ -200,7 +201,7 @@ class MasterCard extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                '${master.hourlyRate!.toStringAsFixed(0)} ${AppStrings.sum}',
+                                '${PriceFormatter.format(master.hourlyRate)} ${AppStrings.sum}',
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,

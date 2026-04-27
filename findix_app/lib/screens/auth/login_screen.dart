@@ -4,6 +4,7 @@ import '../../config/localization.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
 import '../../widgets/gradient_button.dart';
+import '../../utils/phone_utils.dart';
 
 class LoginScreen extends StatefulWidget {
   final AuthService authService;
@@ -16,6 +17,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneFormatter = PhoneUtils.maskFormatter;
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _error;
@@ -119,9 +121,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 TextField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [_phoneFormatter],
                   style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color),
                   decoration: InputDecoration(
-                    hintText: '+998 90 123 45 67',
+                    hintText: '+998 (99) 858-56-88',
                     hintStyle: TextStyle(color: Theme.of(context).hintColor),
                     labelText: AppStrings.phone,
                     labelStyle: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color),

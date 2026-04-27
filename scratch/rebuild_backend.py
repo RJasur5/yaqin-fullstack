@@ -1,17 +1,29 @@
 import paramiko
 
-def rebuild():
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    client.connect('95.182.118.245', username='yaqingo', password='nEQvV9Pi8e')
-    
-    print("REBUILDING BACKEND CONTAINER...")
-    # Using a single string with semicolon for multiple commands to avoid shell issues
-    cmd = "cd yaqin-production; echo 'nEQvV9Pi8e' | sudo -S docker compose up -d --build backend"
-    stdin, stdout, stderr = client.exec_command(cmd)
-    print(stdout.read().decode())
-    print(stderr.read().decode())
-    client.close()
+host = '95.182.118.245'
+user = 'yaqingo'
+password = 'nEQvV9Pi8e'
 
-if __name__ == '__main__':
-    rebuild()
+def rebuild_backend():
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        ssh.connect(host, username=user, password=password)
+        
+        print("--- Rebuilding Backend ---")
+        stdin, stdout, stderr = ssh.exec_command("cd /home/yaqingo/yaqin-production && docker compose up -d --build backend")
+        
+        # Stream the output
+        for line in iter(stdout.readline, ""):
+            print(line, end="")
+        for line in iter(stderr.readline, ""):
+            print(line, end="")
+            
+        print("\n--- Done Rebuilding ---")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        ssh.close()
+
+if __name__ == "__main__":
+    rebuild_backend()

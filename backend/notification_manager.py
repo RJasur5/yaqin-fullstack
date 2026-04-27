@@ -73,7 +73,22 @@ class NotificationManager:
                 return "Заказ завершен", "Ваш заказ успешно выполнен"
             else:
                 return "Buyurtma yakunlandi", "Buyurtmangiz muvaffaqiyatli yakunlandi"
-                
+
+        if type == "job_application":
+            employer_name = data.get("employer_name", "")
+            if lang == "ru":
+                return "Новая заявка на работу!", f"{employer_name} оставил заявку на работу для вас"
+            else:
+                return "Yangi ish arizasi!", f"{employer_name} siz uchun ish arizasi qoldirdi"
+
+        if type == "job_application_status":
+            master_name = data.get("master_name", "")
+            status_text = data.get(f"status_text_{'ru' if lang == 'ru' else 'uz'}", data.get("status", ""))
+            if lang == "ru":
+                return "Статус заявки обновлен", f"Мастер {master_name}: заявка {status_text}"
+            else:
+                return "Ariza holati yangilandi", f"Usta {master_name}: ariza {status_text}"
+
         return "Yaqin", "Новое уведомление"
 
 notification_manager = NotificationManager()

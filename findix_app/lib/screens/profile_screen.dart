@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/theme.dart';
@@ -15,6 +16,7 @@ import '../models/subscription.dart';
 import 'subscription_screen.dart';
 
 import 'admin/admin_panel_screen.dart';
+import 'job_applications_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final AuthService authService;
@@ -237,6 +239,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 32),
 
               // Info cards
+              _infoTile(
+                Icons.fingerprint_rounded, 
+                AppStrings.isRu ? 'Ваш ID (для оплаты)' : 'Sizning ID (to\'lov uchun)', 
+                '${user.id}',
+                onTap: () {
+                  Clipboard.setData(ClipboardData(text: user.id.toString()));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(AppStrings.isRu ? 'ID скопирован!' : 'ID nusxalandi!')),
+                  );
+                },
+                trailing: const Icon(Icons.copy_rounded, size: 18, color: Colors.grey),
+              ),
               _infoTile(Icons.phone_rounded, AppStrings.phone, user.phone),
               _infoTile(Icons.location_city_rounded, AppStrings.city, user.city ?? '-'),
               _infoTile(Icons.language_rounded, AppStrings.language, user.lang == 'ru' ? AppStrings.russian : AppStrings.uzbek),
@@ -320,7 +334,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) => SubscriptionScreen(apiService: widget.apiService),
+                        builder: (_) => SubscriptionScreen(
+                          apiService: widget.apiService,
+                          authService: widget.authService,
+                        ),
                       ),
                     ).then((_) => _loadSubscription());
                   },
@@ -362,6 +379,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Master Specific Actions
               if (user.isMaster) ...[
+                GradientButton(
+                  text: AppStrings.jobApplications,
+                  icon: Icons.work_rounded,
+                  colors: const [Color(0xFFFF6B35), Color(0xFFFF8E53)],
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => JobApplicationsScreen(
+                          apiService: widget.apiService,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
                 GradientButton(
                   text: AppStrings.isRu ? 'Принятые заказы' : 'Qabul qilingan buyurtmalar',
                   icon: Icons.history_rounded,
@@ -416,47 +449,51 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _infoTile(IconData icon, String label, String value) {
+  Widget _infoTile(IconData icon, String label, String value, {VoidCallback? onTap, Widget? trailing}) {
     final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: theme.primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardTheme.color,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: theme.primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: theme.primaryColor, size: 20),
             ),
-            child: Icon(icon, color: theme.primaryColor, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color)),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: theme.textTheme.bodyLarge?.color,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, style: TextStyle(fontSize: 12, color: theme.textTheme.bodySmall?.color)),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: theme.textTheme.bodyLarge?.color,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            if (trailing != null) trailing,
+          ],
+        ),
       ),
     );
   }

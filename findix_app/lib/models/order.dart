@@ -25,6 +25,8 @@ class OrderResponse {
   final bool includeLunch;
   final bool includeTaxi;
   final bool canChat;
+  final bool isCompany;
+  final int applicantsCount;
 
   OrderResponse({
     required this.id,
@@ -51,6 +53,8 @@ class OrderResponse {
     this.includeLunch = false,
     this.includeTaxi = false,
     this.canChat = true,
+    this.isCompany = false,
+    this.applicantsCount = 0,
   });
 
   factory OrderResponse.fromJson(Map<String, dynamic> json) {
@@ -79,6 +83,8 @@ class OrderResponse {
       includeLunch: json['include_lunch'] ?? false,
       includeTaxi: json['include_taxi'] ?? false,
       canChat: json['can_chat'] ?? true,
+      isCompany: json['is_company'] ?? false,
+      applicantsCount: json['applicants_count'] ?? 0,
     );
   }
 

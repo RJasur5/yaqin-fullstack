@@ -17,8 +17,24 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     
+    # Production Info
+    PROD_DOMAIN: str = os.getenv("PROD_DOMAIN", "yaqingo.uz")
+    PROD_IP: str = os.getenv("PROD_IP", "95.182.118.245")
+    
+    # Click Payment
+    CLICK_SERVICE_ID: str = os.getenv("CLICK_SERVICE_ID", "")
+    CLICK_MERCHANT_ID: str = os.getenv("CLICK_MERCHANT_ID", "")
+    CLICK_SECRET_KEY: str = os.getenv("CLICK_SECRET_KEY", "")
+
+    # Payme Payment
+    PAYME_ID: str = os.getenv("PAYME_ID", "")
+    PAYME_KEY: str = os.getenv("PAYME_KEY", "")
+    PAYME_TEST_KEY: str = os.getenv("PAYME_TEST_KEY", "")
+    PAYME_USE_TEST: bool = os.getenv("PAYME_USE_TEST", "true").lower() == "true"
+
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 # Global settings instance
 settings = Settings()

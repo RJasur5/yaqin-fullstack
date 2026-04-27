@@ -4,7 +4,6 @@ import '../../services/socket_service.dart';
 import '../../config/theme.dart';
 import '../../config/api_config.dart';
 import '../../widgets/full_screen_image.dart';
-import 'chat_screen.dart';
 import '../master_detail_screen.dart';
 import '../client_profile_screen.dart';
 import '../../utils/date_utils.dart';

@@ -63,7 +63,11 @@ def get_masters(
 ):
     try:
         user = get_current_user_from_header(authorization, db)
-        is_subscribed = check_subscription(user.id, db)
+        # Employers get free access (no subscription needed)
+        if user.role == "client":
+            is_subscribed = True
+        else:
+            is_subscribed = check_subscription(user.id, "master", db)
     except:
         is_subscribed = False
 
@@ -112,7 +116,11 @@ def get_master_detail(
 ):
     try:
         user = get_current_user_from_header(authorization, db)
-        is_subscribed = check_subscription(user.id, db)
+        # Employers get free access (no subscription needed)
+        if user.role == "client":
+            is_subscribed = True
+        else:
+            is_subscribed = check_subscription(user.id, "master", db)
     except:
         is_subscribed = False
     profile = (

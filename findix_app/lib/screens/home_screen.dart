@@ -298,6 +298,7 @@ class _HomeScreenState extends State<HomeScreen> {
           : const Center(child: CircularProgressIndicator()),
       AvailableOrdersScreen(
         apiService: widget.apiService, 
+        authService: widget.authService,
         categories: _categories, 
         key: ValueKey('available_$_ordersRefreshCounter'),
       ),

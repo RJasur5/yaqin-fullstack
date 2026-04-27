@@ -6,7 +6,7 @@ import time
 from typing import Dict, List
 
 from database import engine, Base
-from routers import auth, masters, categories, favorites, orders, clients, admin, app_reviews, subscriptions
+from routers import auth, masters, categories, favorites, orders, clients, admin, app_reviews, subscriptions, job_applications
 
 from websocket_manager import manager
 from logging_config import setup_logging
@@ -61,8 +61,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static files for uploads
+# Static files for uploads and downloads
+os.makedirs("uploads", exist_ok=True)
+os.makedirs("download", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.mount("/download", StaticFiles(directory="download"), name="download")
 
 # Routers
 app.include_router(auth.router)
@@ -74,6 +77,7 @@ app.include_router(clients.router)
 app.include_router(admin.router)
 app.include_router(app_reviews.router)
 app.include_router(subscriptions.router)
+app.include_router(job_applications.router)
 
 # WebSocket Endpoint
 @app.websocket("/ws/notifications/{user_id}")

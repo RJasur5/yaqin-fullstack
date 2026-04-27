@@ -6,7 +6,8 @@ import '../../widgets/gradient_button.dart';
 import '../../models/category.dart';
 import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
-
+import 'package:flutter/services.dart';
+import '../../utils/formatters.dart';
 class CreateOrderScreen extends StatefulWidget {
   final ApiService apiService;
   final AuthService authService;
@@ -29,6 +30,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   int? _selectedSubcategoryId;
   bool _includeLunch = false;
   bool _includeTaxi = false;
+  bool _isCompany = false;
 
   final List<String> _uzbekistanCities = [
     'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
@@ -91,14 +93,16 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     });
 
     try {
+      final rawPrice = _priceController.text.replaceAll(' ', '');
       await widget.apiService.createOrder(
         subcategoryId: _selectedSubcategoryId!,
         description: _descController.text.trim(),
         city: _selectedCity ?? 'Toshkent',
         district: _selectedDistrict,
-        price: double.tryParse(_priceController.text),
+        price: double.tryParse(rawPrice),
         includeLunch: _includeLunch,
         includeTaxi: _includeTaxi,
+        isCompany: _isCompany,
       );
       if (mounted) {
         Navigator.pop(context, true);
@@ -267,6 +271,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     TextField(
                       controller: _priceController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        ThousandsSeparatorInputFormatter(),
+                      ],
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
                         suffixText: AppStrings.sum,
@@ -277,6 +285,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     const SizedBox(height: 24),
                     _buildOptionToggle(
                       title: AppStrings.includeLunch,
+                      subtitle: AppStrings.isRu ? 'Мастеру будет предоставлен обед' : 'Usta tushlik bilan ta\'minlanadi',
                       icon: Icons.restaurant_rounded,
                       value: _includeLunch,
                       onChanged: (v) => setState(() => _includeLunch = v),
@@ -284,10 +293,21 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     const SizedBox(height: 12),
                     _buildOptionToggle(
                       title: AppStrings.includeTaxi,
+                      subtitle: AppStrings.isRu ? 'Расходы на дорогу оплачиваются' : 'Yo\'l harajatlari qoplanadi',
                       icon: Icons.local_taxi_rounded,
                       value: _includeTaxi,
                       onChanged: (v) => setState(() => _includeTaxi = v),
                     ),
+
+                    const SizedBox(height: 12),
+                    _buildOptionToggle(
+                      title: AppStrings.isRu ? 'Набор персонала (HR)' : 'Xodimlar yollash (HR)',
+                      subtitle: AppStrings.isRu ? 'Множество мастеров могут принять' : 'Ko\'plab ustalar qabul qilishi mumkin',
+                      icon: Icons.groups_rounded,
+                      value: _isCompany,
+                      onChanged: (v) => setState(() => _isCompany = v),
+                    ),
+
 
                     const SizedBox(height: 40),
                     GradientButton(
@@ -325,6 +345,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
   Widget _buildOptionToggle({
     required String title,
+    String? subtitle,
     required IconData icon,
     required bool value,
     required ValueChanged<bool> onChanged,
@@ -346,12 +367,14 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             fontWeight: value ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+        subtitle: subtitle != null ? Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textHint)) : null,
         value: value,
         onChanged: onChanged,
         activeColor: theme.primaryColor,
       ),
     );
   }
+
 
   @override
   void dispose() {
