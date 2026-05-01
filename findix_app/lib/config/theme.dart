@@ -164,6 +164,7 @@ class AppTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: GoogleFonts.nunito().fontFamily,
       brightness: brightness,
       primaryColor: p.primary,
       scaffoldBackgroundColor: p.bg,

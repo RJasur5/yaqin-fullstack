@@ -7,6 +7,7 @@ import '../services/api_service.dart';
 import '../services/theme_service.dart';
 import '../widgets/master_card.dart';
 import 'master_detail_screen.dart';
+import '../config/regions.dart';
 
 class MastersListScreen extends StatefulWidget {
   final ApiService apiService;
@@ -33,11 +34,6 @@ class _MastersListScreenState extends State<MastersListScreen> {
   String _sortBy = 'rating';
   String? _selectedCity;
   final _searchController = TextEditingController();
-
-  final List<String> _cities = [
-    'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
-    'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
-  ];
 
   @override
   void initState() {
@@ -146,9 +142,9 @@ class _MastersListScreenState extends State<MastersListScreen> {
                         value: null, 
                         child: Text(AppStrings.isRu ? 'Все города' : 'Barcha shaharlar', style: theme.textTheme.bodyLarge)
                       ),
-                      ..._cities.map((city) => DropdownMenuItem<String>(
-                        value: city, 
-                        child: Text(city, style: theme.textTheme.bodyLarge)
+                      ...RegionsConfig.regionKeys.map((key) => DropdownMenuItem<String>(
+                        value: RegionsConfig.getDisplayName(key), 
+                        child: Text(RegionsConfig.getDisplayName(key), style: theme.textTheme.bodyLarge)
                       )),
                     ],
                     onChanged: (val) {

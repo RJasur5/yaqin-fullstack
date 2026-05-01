@@ -195,8 +195,12 @@ class NotificationService {
         // If we have order data, we could potentially go to the specific chat, 
         // but for now, we go to the chat list to be safe.
         await nav.pushNamed('/chats');
+      } else if (type == 'job_applications' || type == 'job_application' || type == 'job_application_status') {
+        await nav.pushNamed('/job-applications');
       } else if (type == 'my_orders' || type == 'order_accepted' || type == 'order_completed') {
         await nav.pushNamed('/my-orders');
+      } else if (type == 'profile' || type == 'vacancy_closed') {
+        await nav.pushNamed('/profile');
       } else {
         debugPrint('NOTIFICATION_SERVICE: No specific navigation for type: $type');
       }

@@ -102,8 +102,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                     ),
                     const SizedBox(height: 8),
                     _tierCard('day', isRu ? '1 День' : '1 Kun', '${PriceFormatter.format(5000)} ${AppStrings.sum}', isRu ? '1 Объявление' : '1 e\'lon', Icons.bolt_rounded, 5000, 'master'),
-                    _tierCard('week', isRu ? '1 Неделя' : '1 Hafta', '${PriceFormatter.format(30000)} ${AppStrings.sum}', isRu ? '10 Объявлений' : '10 e\'lon', Icons.auto_awesome_rounded, 30000, 'master'),
-                    _tierCard('month', isRu ? '1 Месяц' : '1 Oy', '${PriceFormatter.format(150000)} ${AppStrings.sum}', isRu ? '45 Объявлений' : '45 e\'lon', Icons.star_rounded, 150000, 'master', isBest: true),
+                    _tierCard('week', isRu ? '1 Неделя' : '1 Hafta', '${PriceFormatter.format(40000)} ${AppStrings.sum}', isRu ? '10 Объявлений' : '10 e\'lon', Icons.auto_awesome_rounded, 40000, 'master'),
+                    _tierCard('2_weeks', isRu ? '2 Недели' : '2 Hafta', '${PriceFormatter.format(100000)} ${AppStrings.sum}', isRu ? '30 Объявлений' : '30 e\'lon', Icons.explore_rounded, 100000, 'master'),
+                    _tierCard('month', isRu ? '1 Месяц' : '1 Oy', '${PriceFormatter.format(150000)} ${AppStrings.sum}', isRu ? '50 Объявлений' : '50 e\'lon', Icons.star_rounded, 150000, 'master', isBest: true),
                     
                     const SizedBox(height: 32),
                     _buildPaymentInfo(),
@@ -265,27 +266,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
             ),
             const SizedBox(height: 24),
             _paymentOption(
-              title: isRu ? 'Карта Uzcard/Humo' : 'Uzcard/Humo kartasi',
-              subtitle: isRu ? 'Ввод данных в приложении' : 'Ilova ichida ma\'lumotlarni kiritish',
-              icon: Icons.credit_card_rounded,
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  this.context,
-                  MaterialPageRoute(
-                    builder: (_) => CardPaymentScreen(
-                      apiService: widget.apiService,
-                      planName: planId,
-                      price: priceVal,
-                      role: role,
-                    ),
-                  ),
-                );
-                if (result == true) _loadSubscription();
-              },
-            ),
-            const SizedBox(height: 12),
-            _paymentOption(
               title: 'Click Up',
               subtitle: isRu ? 'Переход в приложение Click' : 'Click ilovasiga o\'tish',
               icon: Icons.account_balance_wallet_rounded,
@@ -305,11 +285,50 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                 _processPaymePayment(planId, role);
               },
             ),
+            const SizedBox(height: 12),
+            _paymentOption(
+              title: 'Paynet',
+              subtitle: isRu ? 'Оплата через Paynet' : 'Paynet orqali to\'lov',
+              icon: Icons.storefront_rounded,
+              color: const Color(0xFFFFA000),
+              onTap: () {
+                Navigator.pop(context);
+                _processPaynetPayment(planId, role);
+              },
+            ),
             const SizedBox(height: 24),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _processPaynetPayment(String planId, String role) async {
+    setState(() => _isLoading = true);
+    try {
+      final url = await widget.apiService.getPaynetUrl(planId, role: role);
+      final uri = Uri.parse(url);
+      
+      bool launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+
+      if (mounted && launched) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(AppStrings.isRu ? 'Ожидание подтверждения оплаты...' : 'To\'lov tasdiqlanishini kutilmoqda...'))
+        );
+        Future.delayed(const Duration(seconds: 5), () => _loadSubscription());
+      } else if (!launched) {
+        throw 'Could not launch Paynet URL';
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Widget _paymentOption({required String title, required String subtitle, required IconData icon, required VoidCallback onTap, Color? color}) {
@@ -402,6 +421,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Image.network('https://paynet.uz/assets/img/logo.png', height: 24, errorBuilder: (_,__,___) => const SizedBox()),
+              const SizedBox(width: 12),
               Image.network('https://upload.wikimedia.org/wikipedia/commons/b/b5/Payme_logo.png', height: 24, errorBuilder: (_,__,___) => const SizedBox()),
               const SizedBox(width: 12),
               Image.network('https://click.uz/static/img/logo.png', height: 24, errorBuilder: (_,__,___) => const SizedBox()),

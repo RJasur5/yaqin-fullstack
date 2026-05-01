@@ -92,7 +92,7 @@ def deploy():
         
         # Commands to rebuild and migrate
         # Restart EVERYTHING to apply nginx changes
-        full_command = f"cd {project_dir} && (docker compose up --build -d || docker-compose up --build -d) && sleep 5 && docker exec findix-backend python migrate_company_mode.py && docker exec findix-backend python normalize_phones.py"
+        full_command = f"cd {project_dir} && (docker compose up --build -d || docker-compose up --build -d) && sleep 5 && docker compose restart nginx && docker exec findix-backend python migrate_company_mode.py && docker exec findix-backend python normalize_phones.py && docker exec findix-backend python migrate_payme.py && docker exec findix-backend python migrate_regions.py"
         
         print(f"Running: {full_command}")
         stdin, stdout, stderr = ssh.exec_command(full_command)

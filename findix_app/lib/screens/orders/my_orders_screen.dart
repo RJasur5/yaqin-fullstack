@@ -11,6 +11,8 @@ import '../../widgets/rating_stars.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/formatters.dart';
 import 'chat_screen.dart';
+import 'dart:async';
+import '../../services/socket_service.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   final ApiService apiService;
@@ -26,10 +28,39 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
   bool _isLoading = true;
   String? _error;
 
+  StreamSubscription? _socketSubscription;
+  Timer? _countdownTimer;
+
   @override
   void initState() {
     super.initState();
     _loadOrders();
+    _setupSocketListener();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _setupSocketListener() {
+    _socketSubscription = SocketService().messageStream.listen((data) {
+      if (!mounted) return;
+      if (data['type'] == 'order_accepted' || 
+          data['type'] == 'order_completed' || 
+          data['type'] == 'order_rejected' || 
+          data['type'] == 'order_cancelled' ||
+          data['type'] == 'vacancy_closed' ||
+          data['type'] == 'hr_accepted' ||
+          data['type'] == 'hr_expiry_warning') {
+        _loadOrders();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _countdownTimer?.cancel();
+    _socketSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadOrders() async {
@@ -119,6 +150,25 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
 
     try {
       await widget.apiService.rejectMaster(orderId);
+      _loadOrders();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
+  Future<void> _hrAcceptMaster(int orderId) async {
+    final confirmed = await _showConfirmDialog(
+      AppStrings.isRu ? 'Принять мастера' : 'Ustani qabul qilish',
+      AppStrings.isRu ? 'Вы уверены, что хотите принять этого кандидата?' : 'Haqiqatan ham ushbu nomzodni qabul qilmoqchimisiz?',
+    );
+    if (!confirmed) return;
+
+    try {
+      await widget.apiService.hrAcceptMaster(orderId);
       _loadOrders();
     } catch (e) {
       if (mounted) {
@@ -226,6 +276,9 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     if (status == 'accepted') {
       statusColor = Colors.blue;
       statusText = AppStrings.isRu ? 'Принято' : 'Qabul qilingan';
+    } else if (status == 'accepted_hr') {
+      statusColor = Colors.green;
+      statusText = AppStrings.isRu ? 'Принято' : 'Qabul qilindi';  // Принято (вместо Завершено)
     } else if (status == 'completed') {
       statusColor = Colors.green;
       statusText = AppStrings.isRu ? 'Завершено' : 'Tugallangan';
@@ -235,9 +288,15 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
     } else if (status == 'viewed') {
       statusColor = Colors.cyan;
       statusText = AppStrings.applicationViewed;
+    } else if (status == 'vacancy_closed') {
+      statusColor = Colors.deepOrange;
+      statusText = AppStrings.isRu ? 'Вакансия закрыта' : 'Vakansiya yopildi';  // Вакансия закрыта (вместо Отказано)
     } else if (status == 'rejected') {
       statusColor = Colors.red;
       statusText = AppStrings.applicationRejected;
+    } else if (status == 'cancelled') {
+      statusColor = Colors.grey;
+      statusText = AppStrings.isRu ? 'Вы отменили заказ' : 'Siz bekor qildingiz';
     }
 
     // Role badge text
@@ -366,7 +425,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             const SizedBox(height: 12),
             _buildOptionsRow(order),
             // Show the OTHER participant
-            if (isEmployer && order['master_name'] != null) ...[
+            if (isEmployer && order['master_name'] != null && !(order['is_company'] == true && status == 'open')) ...[
               const SizedBox(height: 16),
               Divider(color: theme.dividerColor.withOpacity(0.1)),
               const SizedBox(height: 8),
@@ -398,7 +457,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                 ],
               ),
             ],
-            if (status == 'accepted' || status == 'completed' || (order['is_company'] == true && status == 'open' && order['master_name'] != null)) ...[
+            if (status == 'accepted' || status == 'completed' || status == 'pending') ...[
               const SizedBox(height: 16),
               GradientButton(
                 text: isEmployer
@@ -421,7 +480,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             ],
             // Cancel/Withdraw buttons
             if (isEmployer) ...[
-              if (isApp && (status == 'pending' || status == 'viewed' || status == 'rejected')) ...[
+              if (isApp && (status == 'pending' || status == 'viewed')) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => _withdrawApplication(order['id']),
@@ -434,11 +493,25 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                     minimumSize: const Size(double.infinity, 45),
                   ),
                 ),
-              ] else if (!isApp && status == 'accepted') ...[
+              ] else if (!isApp && (status == 'accepted' || status == 'pending')) ...[
                 if (order['is_company'] == true) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _hrAcceptMaster(order['id']),
+                          icon: const Icon(Icons.check_circle_outline_rounded, size: 18),
+                          label: Text(AppStrings.isRu ? 'Принять' : 'Qabul qilish'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.green,
+                            side: const BorderSide(color: Colors.green),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize: const Size(0, 45),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () => _rejectMaster(order['id']),
@@ -452,24 +525,16 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () => _cancelOrder(order['id']),
-                          icon: const Icon(Icons.cancel_outlined, size: 18),
-                          label: Text(AppStrings.cancelOrder),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize: const Size(0, 45),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ],
               ] else if (!isApp && status == 'open') ...[
+                // HR announcement: show Extend button + countdown
+                if (order['is_company'] == true) ...[
+                  const SizedBox(height: 8),
+                  _buildHrExtendSection(order),
+                  const SizedBox(height: 8),
+                ],
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: () => _cancelOrder(order['id']),
@@ -677,6 +742,117 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Builds countdown + extend button for open HR announcements.
+  /// Shown directly in the card — reliable without WebSocket.
+  Widget _buildHrExtendSection(dynamic order) {
+    final expiresAtStr = order['expires_at'] as String?;
+    DateTime? expiresAt;
+    if (expiresAtStr != null) {
+      try {
+        String parseStr = expiresAtStr;
+        if (!parseStr.endsWith('Z')) {
+          parseStr += 'Z';
+        }
+        expiresAt = DateTime.parse(parseStr).toLocal();
+      } catch (_) {}
+    }
+
+    final now = DateTime.now();
+    Duration remaining = expiresAt != null ? expiresAt.difference(now) : Duration.zero;
+    final bool isExpiringSoon = remaining.inSeconds <= 120; // Show extend button only in last 2 minutes
+    final bool isStillOpen = remaining.inSeconds > 0;
+
+    String countdownText = '';
+    if (expiresAt != null) {
+      if (!isStillOpen) {
+        countdownText = AppStrings.isRu ? 'Объявление закрывается...' : 'E\'lon yopilmoqda...';
+      } else {
+        final min = remaining.inMinutes;
+        final sec = remaining.inSeconds % 60;
+        countdownText = AppStrings.isRu
+            ? 'Осталось: ${min}м ${sec}с'
+            : 'Qoldi: ${min}d ${sec}s';
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (countdownText.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isExpiringSoon
+                  ? Colors.orange.withOpacity(0.12)
+                  : Colors.blue.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isExpiringSoon
+                    ? Colors.orange.withOpacity(0.4)
+                    : Colors.blue.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isExpiringSoon ? Icons.timer_outlined : Icons.schedule_rounded,
+                  size: 16,
+                  color: isExpiringSoon ? Colors.orange : Colors.blue,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  countdownText,
+                  style: TextStyle(
+                    color: isExpiringSoon ? Colors.orange : Colors.blue,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (isExpiringSoon && isStillOpen) ...[
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: () async {
+              try {
+                await widget.apiService.extendHrAnnouncement(order['id']);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(AppStrings.isRu
+                          ? '✅ Объявление продлено ещё на 5 минут!'
+                          : '✅ E\'lon yana 5 daqiqaga uzaytirildi!'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                  _loadOrders();
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${AppStrings.isRu ? 'Ошибка:' : 'Xatolik:'} $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            icon: const Icon(Icons.more_time_rounded, size: 18),
+            label: Text(AppStrings.isRu ? 'Продлить на 5 мин' : 'Ha, 5 daqiqa uzayt.'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              minimumSize: const Size(double.infinity, 45),
+            ),
+          ),
+        ],
+      ],
     );
   }
 

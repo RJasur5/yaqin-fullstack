@@ -8,7 +8,6 @@ class PhoneUtils {
   );
 
   static String normalize(String phone) {
-    // We store exactly what's in the formatter for consistency
-    return phone; 
+    return '+' + phone.replaceAll(RegExp(r'[^0-9]'), '');
   }
 }

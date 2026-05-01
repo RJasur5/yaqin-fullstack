@@ -318,16 +318,6 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
               padding: const EdgeInsets.all(16),
               child: Row(
                 children: [
-                  if (status == 'pending')
-                    Expanded(
-                      child: _actionButton(
-                        AppStrings.isRu ? 'Просмотрено' : "Ko'rildi",
-                        Icons.visibility_rounded,
-                        AppColors.blue,
-                        () => _updateStatus(app['id'], 'viewed'),
-                      ),
-                    ),
-                  if (status == 'pending') const SizedBox(width: 8),
                   Expanded(
                     child: _actionButton(
                       AppStrings.isRu ? 'Принять' : 'Qabul qilish',

@@ -12,6 +12,7 @@ from schemas import (
 from routers.auth import get_current_user_from_header
 from routers.orders import check_subscription
 from utils.security import mask_phone
+from utils.regions import get_region_variants
 
 router = APIRouter(prefix="/api/masters", tags=["Masters"])
 
@@ -88,7 +89,13 @@ def get_masters(
     if subcategory_id:
         query = query.filter(MasterProfile.subcategory_id == subcategory_id)
     if city:
-        query = query.filter(MasterProfile.city.ilike(f"%{city}%"))
+        variants = get_region_variants(city)
+        if len(variants) > 1:
+            from sqlalchemy import or_
+            conditions = [MasterProfile.city.ilike(f"%{v}%") for v in variants]
+            query = query.filter(or_(*conditions))
+        else:
+            query = query.filter(MasterProfile.city.ilike(f"%{city}%"))
     if search:
         query = query.filter(
             (User.name.ilike(f"%{search}%")) |

@@ -40,11 +40,14 @@ class PaymeService:
         if not auth_header or not auth_header.startswith("Basic "):
             return False
             
-        encoded = auth_header.split(" ")[1]
-        decoded = base64.b64decode(encoded).decode()
-        
-        # Format should be Paycom:KEY
-        expected = f"Paycom:{self.key}"
-        return decoded == expected
+        try:
+            encoded = auth_header.split(" ")[1]
+            decoded = base64.b64decode(encoded).decode()
+            
+            # Format should be Paycom:KEY
+            expected = f"Paycom:{self.key}"
+            return decoded == expected
+        except Exception:
+            return False
 
 payme_service = PaymeService()

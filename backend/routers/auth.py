@@ -5,6 +5,7 @@ from jose import jwt
 from datetime import datetime, timedelta, timezone
 import os
 import shutil
+import re
 
 from database import get_db
 from models import User, MasterProfile
@@ -15,6 +16,23 @@ from schemas import (
 )
 from models import Subscription
 from config import settings
+
+
+def normalize_phone_number(phone: str) -> str:
+    """Always normalize to clean +998XXXXXXXXX format for DB storage and lookup."""
+    if not phone:
+        return phone
+    digits = re.sub(r'\D', '', phone)
+    # Handle 998XXXXXXXXX (12 digits with country code)
+    if len(digits) >= 12 and digits.startswith('998'):
+        return '+' + digits[:12]
+    # Handle 9 digit subscriber number only
+    elif len(digits) == 9:
+        return '+998' + digits
+    # Handle any other length - extract last 9 digits
+    elif len(digits) > 9:
+        return '+998' + digits[-9:]
+    return phone  # fallback
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -74,15 +92,18 @@ def get_current_admin(
 
 @router.post("/register", response_model=TokenResponse)
 def register(data: UserRegister, db: Session = Depends(get_db)):
-    # Check if phone already exists
-    existing = db.query(User).filter(User.phone == data.phone).first()
+    # Normalize phone to canonical format: +998XXXXXXXXX
+    clean_phone = normalize_phone_number(data.phone)
+    
+    # Check if phone already exists (search by normalized form)
+    existing = db.query(User).filter(User.phone == clean_phone).first()
     if existing:
         raise HTTPException(status_code=400, detail="Phone already registered")
 
-    # Create user
+    # Create user with normalized phone
     user = User(
         name=data.name,
-        phone=data.phone,
+        phone=clean_phone,
         password_hash=pwd_context.hash(data.password),
         role=data.role,
         city=data.city,
@@ -117,9 +138,26 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=TokenResponse)
 def login(data: UserLogin, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.phone == data.phone).first()
+    # Normalize incoming phone to canonical +998XXXXXXXXX format before lookup
+    clean_phone = normalize_phone_number(data.phone)
+    
+    # Try exact match first
+    user = db.query(User).filter(User.phone == clean_phone).first()
+    
+    # Fallback: search all users and compare normalized phones
+    # (handles legacy formatted phones like "+998 (99) 842-65-74" still in DB)
+    if not user:
+        all_users = db.query(User).all()
+        for u in all_users:
+            if normalize_phone_number(u.phone) == clean_phone:
+                user = u
+                # Fix phone format in DB while we're here
+                u.phone = clean_phone
+                db.commit()
+                break
+    
     if not user or not pwd_context.verify(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid phone or password")
+        raise HTTPException(status_code=401, detail="Неверный номер телефона или пароль")
 
     token = create_token(user.id)
     return TokenResponse(

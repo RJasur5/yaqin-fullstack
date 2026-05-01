@@ -21,6 +21,8 @@ import 'services/socket_service.dart';
 import 'services/notification_service.dart';
 import 'services/theme_service.dart';
 import 'screens/orders/chat_list_screen.dart';
+import 'screens/job_applications_screen.dart';
+import 'screens/profile_screen.dart';
 import 'dart:async';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -194,6 +196,8 @@ class YaqinApp extends StatelessWidget {
               apiService: apiService, 
               currentUserId: authService.userId ?? 0
             ),
+            '/job-applications': (context) => JobApplicationsScreen(apiService: apiService),
+            '/profile': (context) => ProfileScreen(authService: authService, apiService: apiService),
           },
         );
       },

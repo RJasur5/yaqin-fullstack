@@ -33,7 +33,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.initState();
     _loadChats();
     _socketSub = SocketService().messageStream.listen((event) {
-      if (event['type'] == 'chat_message') {
+      if (event['type'] == 'chat_message' || 
+          event['type'] == 'order_accepted' || 
+          event['type'] == 'order_completed' || 
+          event['type'] == 'order_rejected' || 
+          event['type'] == 'order_cancelled' ||
+          event['type'] == 'job_application_status') {
         _loadChats();
       }
     });

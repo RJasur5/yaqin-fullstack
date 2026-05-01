@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../main.dart';
 import '../widgets/order_notification_overlay.dart';
 import '../models/master.dart';
+import '../services/api_service.dart';
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -121,20 +122,35 @@ class SocketService {
           );
         }
       } else if (data['type'] == 'order_accepted') {
+        _messageController.add(data); // BROADCAST TO UI
+        final isCompany = data['is_company'] == 'True' || data['is_company'] == true;
         NotificationService.instance.showNotification(
           id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
-          title: '🤝 Yaqin',
+          title: isCompany ? (AppStrings.isRu ? 'Новый отклик!' : 'Yangi javob!') : '🤝 Yaqin',
           body: AppStrings.isRu 
-            ? 'Мастер ${data['master_name']} принял ваш заказ: ${data['subcategory_name_ru']}'
-            : 'Usta ${data['master_name']} buyurtmangizni qabul qildi: ${data['subcategory_name_uz']}',
+            ? (isCompany ? 'Специалист ${data['master_name']} откликнулся на вашу вакансию!' : 'Мастер ${data['master_name']} принял ваш заказ: ${data['subcategory_name_ru']}')
+            : (isCompany ? 'Mutaxassis ${data['master_name']} sizning vakansiyangizga javob berdi!' : 'Usta ${data['master_name']} buyurtmangizni qabul qildi: ${data['subcategory_name_uz']}'),
           data: {'type': 'my_orders'},
         );
       } else if (data['type'] == 'order_completed') {
+        _messageController.add(data); // BROADCAST TO UI
         NotificationService.instance.showNotification(
           id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
           title: '✅ Yaqin',
           body: AppStrings.orderCompleted,
           data: {'type': 'my_orders'},
+        );
+      } else if (data['type'] == 'order_rejected' || data['type'] == 'order_cancelled' || data['type'] == 'vacancy_closed') {
+        _messageController.add(data); // BROADCAST TO UI
+        String msg = AppStrings.isRu ? 'Заказ отменен или отклонен' : 'Buyurtma bekor qilindi yoki rad etildi';
+        if (data['type'] == 'vacancy_closed') {
+          msg = AppStrings.isRu ? 'Вакансия закрыта' : 'Vakansiya yopildi';
+        }
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: '❌ Yaqin',
+          body: msg,
+          data: {'type': data['type'] == 'vacancy_closed' ? 'profile' : 'my_orders'},
         );
       } else if (data['type'] == 'chat_message') {
         _messageController.add(data); // BROADCAST TO UI
@@ -173,6 +189,84 @@ class SocketService {
           body: AppStrings.isRu
             ? 'Мастер ${data['master_name']}: заявка $statusRu'
             : 'Usta ${data['master_name']}: ariza $statusUz',
+          data: {'type': 'my_orders'},
+        );
+      } else if (data['type'] == 'hr_expiry_warning') {
+        _messageController.add(data); // BROADCAST TO UI
+        // Show dialog to HR employer asking if they want to extend
+        final nav = YaqinApp.navigatorKey.currentState;
+        if (nav != null) {
+          final ctx = nav.overlay?.context;
+          if (ctx != null) {
+            final orderId = data['order_id'] is int ? data['order_id'] : int.tryParse(data['order_id']?.toString() ?? '');
+            final subRu = data['subcategory_name_ru'] ?? '';
+            final subUz = data['subcategory_name_uz'] ?? '';
+            showDialog(
+              context: ctx,
+              barrierDismissible: false,
+              builder: (dialogCtx) => AlertDialog(
+                title: Text(AppStrings.isRu ? '⏰ Объявление закрывается!' : '⏰ E\'lon yopilmoqda!'),
+                content: Text(
+                  AppStrings.isRu
+                    ? 'Вашей вакансии "${AppStrings.isRu ? subRu : subUz}" осталось 2 минуты. Хотите продлить объявление ещё на 5 минут?'
+                    : 'Sizning "${AppStrings.isRu ? subRu : subUz}" e\'loningizga 2 daqiqa qoldi. E\'lonni yana 5 daqiqaga uzaytirmoqchimisiz?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogCtx).pop(),
+                    child: Text(AppStrings.isRu ? 'Нет' : 'Yo\'q'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () async {
+                      Navigator.of(dialogCtx).pop();
+                      if (orderId != null) {
+                        try {
+                          await ApiService().extendHrAnnouncement(orderId);
+                          NotificationService.instance.showNotification(
+                            id: orderId,
+                            title: AppStrings.isRu ? '✅ Объявление продлено' : '✅ E\'lon uzaytirildi',
+                            body: AppStrings.isRu ? 'Объявление продлено ещё на 5 минут' : 'E\'lon yana 5 daqiqaga uzaytirildi',
+                            data: {'type': 'my_orders'},
+                          );
+                        } catch (e) {
+                          debugPrint('SOCKET_SERVICE: Failed to extend HR announcement: $e');
+                        }
+                      }
+                    },
+                    child: Text(AppStrings.isRu ? 'Продлить на 5 мин' : 'Ha, 5 daqiqa uzayt.'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+          // Background: show system notification
+          final orderId = data['order_id'] is int ? data['order_id'] : int.tryParse(data['order_id']?.toString() ?? '') ?? 0;
+          NotificationService.instance.showNotification(
+            id: orderId,
+            title: AppStrings.isRu ? '⏰ Вакансия закрывается через 2 минуты!' : '⏰ Vakansiya 2 daqiqada yopiladi!',
+            body: AppStrings.isRu ? 'Хотите продлить объявление ещё на 5 минут?' : 'E\'lonni yana 5 daqiqaga uzaytirmoqchimisiz?',
+            data: {'type': 'my_orders'},
+          );
+        }
+      } else if (data['type'] == 'vacancy_closed') {
+        _messageController.add(data); // BROADCAST TO UI
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: AppStrings.isRu ? '🔒 Вакансия закрыта' : '🔒 Vakansiya yopildi',
+          body: AppStrings.isRu
+            ? 'HR-объявление «${data['subcategory_name_ru']}» закрыто'
+            : 'HR e\'lon «${data['subcategory_name_uz']}» yopildi',
+          data: {'type': 'my_orders'},
+        );
+      } else if (data['type'] == 'hr_accepted') {
+        _messageController.add(data); // BROADCAST TO UI
+        NotificationService.instance.showNotification(
+          id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
+          title: AppStrings.isRu ? '🎉 Вы приняты!' : '🎉 Siz qabul qilindingiz!',
+          body: AppStrings.isRu
+            ? '${data['client_name']} принял вас на работу по вакансии «${data['subcategory_name_ru']}»'
+            : '${data['client_name']} sizni «${data['subcategory_name_uz']}» vakansiyasiga qabul qildi',
           data: {'type': 'my_orders'},
         );
       }

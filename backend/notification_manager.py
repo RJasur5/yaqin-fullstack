@@ -60,10 +60,17 @@ class NotificationManager:
                 return "Yangi buyurtma!", f"Buyurtma bor: {data.get('subcategory_name_uz', 'Batafsil ilovada')}"
                 
         if type == "order_accepted":
-            if lang == "ru":
-                return "Заказ принят", f"Мастер {data.get('master_name', '')} принял ваш заказ"
+            is_company = str(data.get('is_company', 'False')).lower() == 'true'
+            if is_company:
+                if lang == "ru":
+                    return "Новый отклик!", f"Специалист {data.get('master_name', '')} откликнулся на вашу вакансию!"
+                else:
+                    return "Yangi javob!", f"Mutaxassis {data.get('master_name', '')} sizning vakansiyangizga javob berdi!"
             else:
-                return "Buyurtma qabul qilindi", f"Usta {data.get('master_name', '')} buyurtmangizni qabul qildi"
+                if lang == "ru":
+                    return "Заказ принят", f"Мастер {data.get('master_name', '')} принял ваш заказ"
+                else:
+                    return "Buyurtma qabul qilindi", f"Usta {data.get('master_name', '')} buyurtmangizni qabul qildi"
                 
         if type == "chat_message":
             return f"{data.get('sender_name', 'Сообщение')}", data.get("text", "Новое сообщение")

@@ -104,9 +104,15 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
     if (status == 'accepted') {
       statusColor = Colors.blue;
       statusText = AppStrings.isRu ? 'Принято' : 'Qabul qilingan';
+    } else if (status == 'accepted_hr') {
+      statusColor = Colors.green;
+      statusText = AppStrings.isRu ? 'Принято' : 'Qabul qilindi';  // Принято (вместо Завершено)
     } else if (status == 'completed') {
       statusColor = Colors.green;
       statusText = AppStrings.isRu ? 'Завершено' : 'Tugallangan';
+    } else if (status == 'vacancy_closed') {
+      statusColor = Colors.deepOrange;
+      statusText = AppStrings.isRu ? 'Вакансия закрыта' : 'Vakansiya yopildi';  // Вместо Отказано
     } else if (status == 'rejected') {
       statusColor = Colors.red;
       statusText = AppStrings.isRu ? 'Отказано' : 'Rad etilgan';

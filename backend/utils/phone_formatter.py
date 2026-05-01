@@ -26,3 +26,24 @@ def format_phone(phone: str) -> str:
     # Reconstruct in desired format: +998 (99) 858-56-88
     # main_part is '998585688'
     return f"+998 ({main_part[0:2]}) {main_part[2:5]}-{main_part[5:7]}-{main_part[7:9]}"
+
+
+def normalize_phone(phone: str) -> str:
+    """
+    Normalizes any phone to clean '+998XXXXXXXXX' format for DB storage/lookup.
+    Strips all non-digit characters, ensures +998 prefix.
+    """
+    if not phone:
+        return phone
+    
+    digits = re.sub(r'\D', '', phone)
+    
+    if len(digits) >= 12 and digits.startswith('998'):
+        return '+' + digits[:12]
+    elif len(digits) == 9:
+        return '+998' + digits
+    else:
+        if len(digits) > 9:
+            return '+998' + digits[-9:]
+        return phone  # Can't normalize properly
+

@@ -8,6 +8,8 @@ import '../../services/auth_service.dart';
 import '../../services/theme_service.dart';
 import 'package:flutter/services.dart';
 import '../../utils/formatters.dart';
+import '../../config/regions.dart';
+
 class CreateOrderScreen extends StatefulWidget {
   final ApiService apiService;
   final AuthService authService;
@@ -32,19 +34,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   bool _includeTaxi = false;
   bool _isCompany = false;
 
-  final List<String> _uzbekistanCities = [
-    'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
-    'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
-  ];
-  String? _selectedCity;
-
-  final List<String> _tashkentDistricts = [
-    'Все районы (весь город)',
-    'Yunusobod', 'Mirzo Ulug\'bek', 'Yashnobod', 'Mirobod', 
-    'Yakkasaroy', 'Chilonzor', 'Uchtepa', 'Shayxontohur', 
-    'Olmazor', 'Sergeli', 'Yangihayot', 'Bektemir'
-  ];
-  String? _selectedDistrict;
+  String? _selectedCityKey;
+  String? _selectedDistrictKey;
 
   @override
   void initState() {
@@ -58,7 +49,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       if (mounted) {
         setState(() {
           _categories = cats;
-          _selectedCity = widget.authService.currentUser?.city ?? 'Toshkent';
+          _selectedCityKey = widget.authService.currentUser?.city != null
+              ? RegionsConfig.getKey(widget.authService.currentUser!.city!)
+              : null;
+          if (_selectedCityKey == null || !RegionsConfig.regionKeys.contains(_selectedCityKey)) {
+            _selectedCityKey = RegionsConfig.regionKeys.first;
+          }
           _isLoading = false;
         });
       }
@@ -81,7 +77,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       setState(() => _error = AppStrings.isRu ? 'Опишите задачу' : 'Vazifani tavsiflang');
       return;
     }
-    if (_selectedCity == 'Toshkent' && _selectedDistrict == null) {
+    if (_selectedCityKey != null && _selectedDistrictKey == null) {
       setState(() => _error = AppStrings.isRu ? 'Выберите район' : 'Tumanni tanlang');
       return;
     }
@@ -94,11 +90,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
     try {
       final rawPrice = _priceController.text.replaceAll(' ', '');
+      final cityForApi = _selectedCityKey != null ? RegionsConfig.getDisplayName(_selectedCityKey!) : RegionsConfig.getDisplayName(RegionsConfig.regionKeys.first);
+      final districtForApi = _selectedDistrictKey != null ? RegionsConfig.getDistrictDisplay(_selectedDistrictKey!, _selectedCityKey) : null;
       await widget.apiService.createOrder(
         subcategoryId: _selectedSubcategoryId!,
         description: _descController.text.trim(),
-        city: _selectedCity ?? 'Toshkent',
-        district: _selectedDistrict,
+        city: cityForApi,
+        district: districtForApi,
         price: double.tryParse(rawPrice),
         includeLunch: _includeLunch,
         includeTaxi: _includeTaxi,
@@ -205,57 +203,60 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     _dropdownWrapper(
                       child: DropdownButton<String>(
                         isExpanded: true,
-                        value: _selectedCity,
-                        hint: Text(AppStrings.isRu ? 'Выберите город' : 'Shaharni tanlang', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
+                        value: _selectedCityKey,
+                        hint: Text(AppStrings.isRu ? 'Выберите регион' : 'Viloyatni tanlang', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
                         dropdownColor: Theme.of(context).cardTheme.color,
-                        items: _uzbekistanCities.map((c) {
+                        items: RegionsConfig.regionKeys.map((key) {
                           return DropdownMenuItem<String>(
-                            value: c,
-                            child: Text(c, style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
+                            value: key,
+                            child: Text(RegionsConfig.getDisplayName(key), style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
                           );
                         }).toList(),
                         onChanged: (val) {
                           setState(() {
-                            _selectedCity = val;
-                            _selectedDistrict = null;
+                            _selectedCityKey = val;
+                            _selectedDistrictKey = null;
                           });
                         },
                       ),
                     ),
 
                     const SizedBox(height: 24),
-                    if (_selectedCity == 'Toshkent') ...[
+                    if (_selectedCityKey != null && RegionsConfig.getDistricts(_selectedCityKey).isNotEmpty) ...[
                       Text(
-                        AppStrings.isRu ? 'Район (Ташкент)' : 'Tuman (Toshkent)',
+                        AppStrings.isRu ? 'Район' : 'Tuman',
                         style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
                       _dropdownWrapper(
                         child: DropdownButton<String>(
                           isExpanded: true,
-                          value: _selectedDistrict,
+                          value: _selectedDistrictKey,
                           hint: Text(AppStrings.isRu ? 'Выберите район' : 'Tumanni tanlang', style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color)),
                           dropdownColor: Theme.of(context).cardTheme.color,
-                          items: _tashkentDistricts.map((d) {
+                          items: RegionsConfig.getDistricts(_selectedCityKey).map((displayName) {
+                            final key = RegionsConfig.getDistrictKey(displayName, _selectedCityKey);
                             return DropdownMenuItem<String>(
-                              value: d,
-                              child: Text(d, style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
+                              value: key,
+                              child: Text(displayName, style: TextStyle(color: Theme.of(context).textTheme.bodyLarge?.color)),
                             );
                           }).toList(),
-                          onChanged: (val) => setState(() => _selectedDistrict = val),
+                          onChanged: (val) => setState(() => _selectedDistrictKey = val),
                         ),
                       ),
                     ],
 
                     const SizedBox(height: 24),
                     Text(
-                      AppStrings.description,
+                      AppStrings.isRu ? 'О работе' : 'Ish haqida',
                       style: TextStyle(color: Theme.of(context).textTheme.titleLarge?.color, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _descController,
-                      maxLines: 4,
+                      minLines: 4,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
                       style: theme.textTheme.bodyLarge,
                       decoration: InputDecoration(
                         hintText: AppStrings.isRu ? 'Расскажите, что нужно сделать...' : 'Nima qilish kerakligini aytib bering...',

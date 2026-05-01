@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime, timezone
-from utils.phone_formatter import format_phone
+from utils.phone_formatter import format_phone, normalize_phone
 
 
 # ==================== AUTH ====================
@@ -17,7 +17,7 @@ class UserRegister(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        return format_phone(v)
+        return normalize_phone(v)
 
 
 class UserLogin(BaseModel):
@@ -27,7 +27,7 @@ class UserLogin(BaseModel):
     @field_validator("phone")
     @classmethod
     def validate_phone(cls, v: str) -> str:
-        return format_phone(v)
+        return normalize_phone(v)
 
 class FCMTokenUpdate(BaseModel):
     fcm_token: str
@@ -307,6 +307,7 @@ class OrderResponse(BaseModel):
     is_company: bool = False
     applicants_count: int = 0
     my_role: Optional[str] = None  # "employer" or "worker" — tells the client who THEY are in this order
+    expires_at: Optional[datetime] = None  # For HR announcements: when will it close?
 
     class Config:
         from_attributes = True

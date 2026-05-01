@@ -375,6 +375,16 @@ class ApiService {
     throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to accept order');
   }
 
+  Future<void> hrAcceptMaster(int orderId) async {
+    final res = await http.put(
+      Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/hr-accept'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to accept master');
+    }
+  }
+
   // ==================== CLIENTS ====================
 
   Future<void> rateClient(int orderId, int rating, String? comment) async {
@@ -613,7 +623,15 @@ class ApiService {
     if (res.statusCode == 200) {
       return SubscriptionModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get subscription');
+    // Handle non-JSON responses (e.g. nginx 502 HTML pages)
+    try {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get subscription');
+    } catch (e) {
+      if (e is FormatException) {
+        throw Exception('Server unavailable (${res.statusCode})');
+      }
+      rethrow;
+    }
   }
 
   Future<SubscriptionModel> payWithCard({
@@ -661,6 +679,18 @@ class ApiService {
       return jsonDecode(res.body)['url'];
     }
     throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get Payme URL');
+  }
+
+  Future<String> getPaynetUrl(String planName, {String role = 'master'}) async {
+    final res = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/paynet-url?plan_name=$planName&role=$role'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body)['url'];
+    }
+    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get Paynet URL');
   }
 
   // ==================== JOB APPLICATIONS ====================
@@ -759,6 +789,18 @@ class ApiService {
     ).timeout(const Duration(seconds: 30));
     if (res.statusCode != 200) {
       throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to reject master');
+    }
+  }
+
+  /// Extends an active HR announcement by 5 more minutes.
+  /// Called when HR employer taps "Yes" in the expiry warning dialog.
+  Future<void> extendHrAnnouncement(int orderId) async {
+    final res = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/extend-hr'),
+      headers: _headers,
+    ).timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to extend HR announcement');
     }
   }
 }

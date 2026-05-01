@@ -58,19 +58,21 @@ async def create_job_application(
     db.commit()
     db.refresh(application)
 
-    # Send notification to master
-    background_tasks.add_task(
-        notification_manager.send_notification,
-        profile.user_id, "job_application",
-        {
-            "application_id": application.id,
-            "employer_name": user.name,
-            "employer_id": user.id,
-            "description": data.description,
-            "city": data.city,
-            "phone": data.phone or user.phone,
-        }
-    )
+    # Send notification to master (await directly, background_tasks drops async coroutines)
+    try:
+        await notification_manager.send_notification(
+            profile.user_id, "job_application",
+            {
+                "application_id": application.id,
+                "employer_name": user.name,
+                "employer_id": user.id,
+                "description": data.description,
+                "city": data.city,
+                "phone": data.phone or user.phone,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send job_application notification: {e}")
 
     return JobApplicationResponse(
         id=application.id,
@@ -241,17 +243,20 @@ async def update_application_status(
     status_text_ru = {"viewed": "просмотрена", "accepted": "принята", "rejected": "отклонена"}
     status_text_uz = {"viewed": "ko'rildi", "accepted": "qabul qilindi", "rejected": "rad etildi"}
 
-    background_tasks.add_task(
-        notification_manager.send_notification,
-        app.employer_id, "job_application_status",
-        {
-            "application_id": app.id,
-            "master_name": user.name,
-            "status": data.status,
-            "status_text_ru": status_text_ru.get(data.status, data.status),
-            "status_text_uz": status_text_uz.get(data.status, data.status),
-        }
-    )
+    try:
+        await notification_manager.send_notification(
+            app.employer_id, "job_application_status",
+            {
+                "application_id": app.id,
+                "master_name": user.name,
+                "status": data.status,
+                "status_text_ru": status_text_ru.get(data.status, data.status),
+                "status_text_uz": status_text_uz.get(data.status, data.status),
+            }
+        )
+        print(f"NOTIFY: Sent job_application_status to employer {app.employer_id}")
+    except Exception as e:
+        logger.error(f"Failed to send job_application_status notification: {e}")
 
     return MessageResponse(message=f"Статус заявки обновлен на: {data.status}")
     
@@ -281,13 +286,15 @@ async def withdraw_job_application(
     db.commit()
     
     # Notify master about withdrawal
-    background_tasks.add_task(
-        notification_manager.send_notification,
-        master_user_id, "job_application_withdrawn",
-        {
-            "employer_name": user.name,
-        }
-    )
+    try:
+        await notification_manager.send_notification(
+            master_user_id, "job_application_withdrawn",
+            {
+                "employer_name": user.name,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to send withdrawal notification: {e}")
     
     return MessageResponse(message="Заявка успешно отозвана")
 

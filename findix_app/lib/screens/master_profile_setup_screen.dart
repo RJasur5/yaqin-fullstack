@@ -8,6 +8,7 @@ import '../widgets/gradient_button.dart';
 import '../models/category.dart';
 import 'package:flutter/services.dart';
 import '../utils/formatters.dart';
+import '../config/regions.dart';
 
 class MasterProfileSetupScreen extends StatefulWidget {
   final ApiService apiService;
@@ -39,26 +40,19 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
   int? _selectedCategoryId;
   int? _selectedSubcategoryId;
 
-  final List<String> _uzbekistanCities = [
-    'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
-    'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
-  ];
-  String? _selectedCity;
-
-  final List<String> _tashkentDistricts = [
-    'Yunusobod', 'Mirzo Ulug\'bek', 'Yashnobod', 'Mirobod', 
-    'Yakkasaroy', 'Chilonzor', 'Uchtepa', 'Shayxontohur', 
-    'Olmazor', 'Sergeli', 'Yangihayot', 'Bektemir'
-  ];
-  String? _selectedDistrict;
+  String? _selectedCityKey; // stores key like 'toshkent_shahar'
+  String? _selectedDistrictKey; // stores key like 'mirobod'
 
   @override
   void initState() {
     super.initState();
     _loadData();
-    _selectedCity = widget.authService.currentUser?.city;
-    if (_selectedCity != null && !_uzbekistanCities.contains(_selectedCity)) {
-       _selectedCity = null;
+    final userCity = widget.authService.currentUser?.city;
+    if (userCity != null) {
+      _selectedCityKey = RegionsConfig.getKey(userCity);
+      if (!RegionsConfig.regionKeys.contains(_selectedCityKey)) {
+        _selectedCityKey = null;
+      }
     }
   }
 
@@ -76,15 +70,13 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
         _experienceController.text = profile.experienceYears.toString();
         _skillsController.text = profile.skills.join(', ');
         _addressController.text = profile.address ?? '';
-        _selectedDistrict = profile.district?.trim();
-        _selectedCity = profile.city?.trim();
-        _selectedSubcategoryId = profile.subcategoryId;
-        
-        // Ensure _selectedDistrict is in the allowed list or set to null
-        if (_selectedDistrict != null && !_tashkentDistricts.contains(_selectedDistrict)) {
-          print('DEBUG: Profile district "$_selectedDistrict" not in list! Resetting.');
-          _selectedDistrict = null;
+        if (profile.city != null) {
+          _selectedCityKey = RegionsConfig.getKey(profile.city!.trim());
         }
+        if (profile.district != null && _selectedCityKey != null) {
+          _selectedDistrictKey = RegionsConfig.getDistrictKey(profile.district!.trim(), _selectedCityKey);
+        }
+        _selectedSubcategoryId = profile.subcategoryId;
         
         // Find category ID
         for (var cat in _categories) {
@@ -124,7 +116,7 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
       return;
     }
     
-    if (_selectedCity == 'Toshkent' && _selectedDistrict == null) {
+    if (_selectedCityKey != null && _selectedDistrictKey == null) {
        if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,11 +140,13 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
         skills = skillsText.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
       }
 
-      print('DEBUG: Sending to API - District: $_selectedDistrict, Subcategory: $_selectedSubcategoryId');
+      // Convert keys to display names for API
+      final cityForApi = _selectedCityKey != null ? RegionsConfig.getDisplayName(_selectedCityKey!) : null;
+      final districtForApi = _selectedDistrictKey != null ? RegionsConfig.getDistrictDisplay(_selectedDistrictKey!, _selectedCityKey) : null;
 
       String? addressToSend = _addressController.text.trim();
-      if (_selectedCity == 'Toshkent' && _selectedDistrict != null) {
-        addressToSend = ''; // Clear address if district is selected
+      if (_selectedCityKey != null && _selectedDistrictKey != null) {
+        addressToSend = '';
       }
 
       if (_isEditing) {
@@ -161,8 +155,8 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
           description: _descController.text.trim(),
           experienceYears: int.tryParse(_experienceController.text) ?? 0,
           hourlyRate: double.tryParse(_hourlyRateController.text.replaceAll(' ', '')),
-          city: _selectedCity,
-          district: _selectedDistrict,
+          city: cityForApi,
+          district: districtForApi,
           address: addressToSend,
           skills: skills,
         );
@@ -172,16 +166,16 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
           description: _descController.text.trim(),
           experienceYears: int.tryParse(_experienceController.text) ?? 0,
           hourlyRate: double.tryParse(_hourlyRateController.text.replaceAll(' ', '')),
-          city: _selectedCity,
-          district: _selectedDistrict,
+          city: cityForApi,
+          district: districtForApi,
           address: addressToSend,
           skills: skills,
         );
       }
 
       // also update user city if needed
-      if (_selectedCity != null && _selectedCity != widget.authService.currentUser?.city) {
-        await widget.apiService.updateProfile(city: _selectedCity);
+      if (cityForApi != null && cityForApi != widget.authService.currentUser?.city) {
+        await widget.apiService.updateProfile(city: cityForApi);
       }
 
       if (mounted) {
@@ -321,31 +315,35 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                       style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      value: _selectedCity,
-                      dropdownColor: theme.cardTheme.color,
-                      icon: Icon(Icons.arrow_drop_down_rounded, color: theme.hintColor),
-                      style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: theme.cardTheme.color,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide: BorderSide.none,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: theme.cardTheme.color,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          isExpanded: true,
+                          value: _selectedCityKey,
+                          hint: Text(AppStrings.city, style: TextStyle(color: theme.hintColor)),
+                          dropdownColor: theme.cardTheme.color,
+                          items: RegionsConfig.regionKeys.map((key) {
+                            return DropdownMenuItem<String>(
+                              value: key,
+                              child: Text(RegionsConfig.getDisplayName(key), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() { _selectedCityKey = val; _selectedDistrictKey = null; });
+                          },
                         ),
                       ),
-                      items: _uzbekistanCities.map((city) {
-                        return DropdownMenuItem(value: city, child: Text(city));
-                      }).toList(),
-                      onChanged: (val) {
-                        setState(() { _selectedCity = val; });
-                      },
                     ),
                     const SizedBox(height: 20),
 
-                    if (_selectedCity == 'Toshkent') ...[
+                    if (_selectedCityKey != null && RegionsConfig.getDistricts(_selectedCityKey).isNotEmpty) ...[
                       Text(
-                        AppStrings.isRu ? 'Район (Ташкент)' : 'Tuman (Toshkent)',
+                        AppStrings.isRu ? 'Район' : 'Tuman',
                         style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 8),
@@ -358,16 +356,17 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                         child: DropdownButtonHideUnderline(
                           child: DropdownButton<String>(
                             isExpanded: true,
-                            value: _selectedDistrict,
+                            value: _selectedDistrictKey,
                             hint: Text(AppStrings.isRu ? 'Выберите район' : 'Tumanni tanlang', style: TextStyle(color: theme.hintColor)),
                             dropdownColor: theme.cardTheme.color,
-                            items: _tashkentDistricts.map((d) {
+                            items: RegionsConfig.getDistricts(_selectedCityKey).map((displayName) {
+                              final key = RegionsConfig.getDistrictKey(displayName, _selectedCityKey);
                               return DropdownMenuItem<String>(
-                                value: d,
-                                child: Text(d, style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+                                value: key,
+                                child: Text(displayName, style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
                               );
                             }).toList(),
-                            onChanged: (val) => setState(() => _selectedDistrict = val),
+                            onChanged: (val) => setState(() => _selectedDistrictKey = val),
                           ),
                         ),
                       ),

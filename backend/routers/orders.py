@@ -7,6 +7,7 @@ from database import get_db, SessionLocal
 from models import User, MasterProfile, Subcategory, Category, Order, ClientReview, Review, ChatMessage, Subscription, JobApplication, OrderAssignment
 from schemas import OrderCreate, OrderResponse, MessageResponse, ClientReviewCreate, ReviewCreate, ChatMessageResponse, ChatMessageCreate, ChatSummaryResponse
 from utils.security import mask_phone, filter_description
+from utils.regions import normalize_region_name, get_region_variants
 from routers.auth import get_current_user_from_header
 from websocket_manager import manager
 from notification_manager import notification_manager
@@ -15,28 +16,112 @@ import asyncio
 router = APIRouter(prefix="/api/orders", tags=["Orders"])
 
 async def auto_cancel_company_order(order_id: int):
-    """After 3 days, auto-cancel all remaining assignments for a company order."""
-    from datetime import timedelta
-    await asyncio.sleep(259200)  # 3 days = 259200 seconds
+    """Dynamically monitors the HR announcement and auto-cancels when time expires."""
+    import asyncio
+    from datetime import datetime, timezone, timedelta
     
+    while True:
+        db = SessionLocal()
+        try:
+            order = db.query(Order).filter(Order.id == order_id).first()
+            if not order or not order.is_company or order.status != "open":
+                return  # Order is already closed or not valid
+                
+            now = datetime.now(timezone.utc)
+            created_at_utc = order.created_at
+            if created_at_utc.tzinfo is None:
+                created_at_utc = created_at_utc.replace(tzinfo=timezone.utc)
+                
+            expires_at = created_at_utc + timedelta(minutes=5)
+            remaining_seconds = (expires_at - now).total_seconds()
+            
+            if remaining_seconds <= 0:
+                break  # Time is completely up, proceed to cancel!
+                
+            if remaining_seconds > 120:
+                # Sleep until exactly 2 minutes are left
+                sleep_time = remaining_seconds - 120
+                db.close()
+                await asyncio.sleep(sleep_time)
+                continue
+                
+            # If we are exactly at or below 2 minutes left, send a warning
+            try:
+                await notification_manager.send_notification(
+                    order.client_id, "hr_expiry_warning",
+                    {
+                        "order_id": order.id,
+                        "subcategory_name_ru": order.subcategory.name_ru if order.subcategory else "",
+                        "subcategory_name_uz": order.subcategory.name_uz if order.subcategory else "",
+                        "minutes_left": 2,
+                    }
+                )
+            except Exception as ne:
+                print(f"BACKGROUND: Failed to send warning: {ne}")
+                
+            # Sleep the remaining time
+            db.close()
+            await asyncio.sleep(remaining_seconds)
+            continue  # Loop back to verify time is actually up (in case they extended during the last 2 minutes)
+            
+        except Exception as e:
+            print(f"BACKGROUND ERROR in monitor loop for order {order_id}: {e}")
+            return
+        finally:
+            if 'db' in locals() and getattr(db, 'is_active', False):
+                db.close()
+
+    # Outside the loop: TIME IS UP!
     db = SessionLocal()
     try:
         order = db.query(Order).filter(Order.id == order_id).first()
-        if order and order.is_company and order.status == "open":
-            order.status = "cancelled"
+        if not order or not order.is_company or order.status != "open":
+            return
+            
+        order.status = "cancelled"
+        db.commit()
+        
+        # Find and close ALL pending child orders for this HR announcement
+        pending_children = db.query(Order).filter(
+            Order.client_id == order.client_id,
+            Order.subcategory_id == order.subcategory_id,
+            Order.is_company == True,
+            Order.status == "pending",
+            Order.id != order.id
+        ).all()
+        
+        for child in pending_children:
+            child.status = "vacancy_closed"
             db.commit()
             
-            # Notify all assigned masters
-            assignments = db.query(OrderAssignment).filter(OrderAssignment.order_id == order_id).all()
-            for assign in assignments:
-                master_user = db.query(User).join(MasterProfile).filter(MasterProfile.id == assign.master_id).first()
-                if master_user:
+            if child.master and child.master.user_id:
+                try:
                     await notification_manager.send_notification(
-                        master_user.id, "order_cancelled",
-                        {"order_id": order.id, "client_name": order.client.name if order.client else ""}
+                        child.master.user_id, "vacancy_closed",
+                        {
+                            "order_id": child.id,
+                            "client_name": order.client.name if order.client else "",
+                            "subcategory_name_ru": order.subcategory.name_ru if order.subcategory else "",
+                            "subcategory_name_uz": order.subcategory.name_uz if order.subcategory else "",
+                        }
                     )
-            
-            print(f"BACKGROUND: Company order {order_id} auto-cancelled after 3 days.")
+                except Exception as ne:
+                    pass
+                    
+        print(f"BACKGROUND: Company order {order_id} auto-cancelled. Closed {len(pending_children)} pending applications.")
+        
+        # Notify the HR employer via websocket that the vacancy was closed
+        try:
+            await notification_manager.send_notification(
+                order.client_id, "vacancy_closed",
+                {
+                    "order_id": order.id,
+                    "type": "vacancy_closed"
+                }
+            )
+        except:
+            pass
+
     except Exception as e:
         print(f"BACKGROUND ERROR auto-cancelling company order {order_id}: {e}")
     finally:
@@ -77,6 +162,34 @@ async def complete_order_after_delay(order_id: int):
             print(f"BACKGROUND: Order {order_id} auto-completed and users notified.")
     except Exception as e:
         print(f"BACKGROUND ERROR auto-completing order {order_id}: {e}")
+    finally:
+        db.close()
+
+async def auto_reject_company_order_application(order_id: int):
+    # Wait for 5 minutes
+    await asyncio.sleep(300)
+    
+    db = SessionLocal()
+    try:
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if order and order.is_company and order.status == "pending":
+            order.status = "vacancy_closed"  # Вакансия закрыта (вместо rejected)
+            db.commit()
+            
+            # Notify master
+            if order.master and order.master.user_id:
+                await notification_manager.send_notification(
+                    order.master.user_id, "vacancy_closed",
+                    {
+                        "order_id": order.id,
+                        "client_name": order.client.name if order.client else "",
+                        "subcategory_name_ru": order.subcategory.name_ru if order.subcategory else "",
+                        "subcategory_name_uz": order.subcategory.name_uz if order.subcategory else "",
+                    }
+                )
+            print(f"BACKGROUND: Company child order {order_id} auto-closed (vacancy_closed) after 5 minutes.")
+    except Exception as e:
+        print(f"BACKGROUND ERROR auto-closing company order {order_id}: {e}")
     finally:
         db.close()
 
@@ -123,10 +236,16 @@ def can_accept_orders(user_id: int, role: str, db: Session) -> bool:
     return True
 
 def build_order_response(order: Order, is_subscribed: bool = True, override_master: Optional[MasterProfile] = None) -> OrderResponse:
+    from datetime import timedelta
     # Ensure created_at is timezone-aware UTC
     created_at = order.created_at
     if created_at and created_at.tzinfo is not None:
         created_at = created_at.replace(tzinfo=None)
+    
+    # For HR announcements, calculate when it expires (5 min after creation)
+    expires_at = None
+    if order.is_company and order.status == "open" and created_at:
+        expires_at = created_at + timedelta(minutes=5)
     
     # Use override_master if provided (for multiple assignments), otherwise use order.master
     m_profile = override_master if override_master else order.master
@@ -158,7 +277,8 @@ def build_order_response(order: Order, is_subscribed: bool = True, override_mast
         can_chat=is_subscribed,
         is_application=False,
         is_company=order.is_company,
-        applicants_count=len(order.assignments) if order.assignments else 0
+        applicants_count=len(order.assignments) if order.assignments else 0,
+        expires_at=expires_at,
     )
     
     if not is_subscribed:
@@ -202,7 +322,7 @@ def build_application_order_response(app: JobApplication) -> OrderResponse:
     )
 
 @router.post("", response_model=OrderResponse)
-def create_order(
+async def create_order(
     data: OrderCreate,
     background_tasks: BackgroundTasks,
     authorization: str = Header(""),
@@ -260,15 +380,22 @@ def create_order(
             if m.user_id not in online_user_ids:
                 continue
             
+            # Normalize names to handle Ru/Uz language differences
+            order_city_norm = normalize_region_name(order.city) if order.city else ""
+            m_city_norm = normalize_region_name(m.city) if m.city else ""
+            
             # City filter
-            if order.city and m.city and (order.city.lower() not in m.city.lower()):
+            if order_city_norm and m_city_norm and (order_city_norm not in m_city_norm):
                 continue
                 
             # District filter: if order has a specific district, only notify those in that district 
             # OR those with NO district filter (they work everywhere)
-            ALL_DISTRICTS = "Все районы (весь город)"
-            if order.district and order.district != ALL_DISTRICTS:
-                if m.district and m.district != ALL_DISTRICTS and (order.district.lower() not in m.district.lower()):
+            order_dist_norm = normalize_region_name(order.district) if order.district else ""
+            m_dist_norm = normalize_region_name(m.district) if m.district else ""
+            
+            ALL_DISTRICTS_NORM = ["barcha tumanlar"]
+            if order_dist_norm and order_dist_norm not in ALL_DISTRICTS_NORM:
+                if m_dist_norm and m_dist_norm not in ALL_DISTRICTS_NORM and (order_dist_norm not in m_dist_norm):
                     continue
             
             targeted_user_ids.append(m.user_id)
@@ -281,20 +408,22 @@ def create_order(
         
         if targeted_user_ids:
             for master_user_id in targeted_user_ids:
-                background_tasks.add_task(
-                    notification_manager.send_notification,
-                    master_user_id, "new_order",
-                    {
-                        "order_id": order.id,
-                        "subcategory_id": order.subcategory_id,
-                        "subcategory_name_ru": order.subcategory.name_ru,
-                        "subcategory_name_uz": order.subcategory.name_uz,
-                        "description": order.description,
-                        "city": order.city,
-                        "district": order.district,
-                        "price": order.price
-                    }
-                )
+                try:
+                    await notification_manager.send_notification(
+                        master_user_id, "new_order",
+                        {
+                            "order_id": order.id,
+                            "subcategory_id": order.subcategory_id,
+                            "subcategory_name_ru": order.subcategory.name_ru,
+                            "subcategory_name_uz": order.subcategory.name_uz,
+                            "description": order.description,
+                            "city": order.city,
+                            "district": order.district,
+                            "price": order.price
+                        }
+                    )
+                except Exception as ne:
+                    print(f"NOTIFY ERROR for user {master_user_id}: {ne}")
             
     except Exception as e:
         print(f"NOTIFY CRITICAL ERROR: {e}")
@@ -332,7 +461,13 @@ def get_available_orders(
     if subcategory_id:
         query = query.filter(Order.subcategory_id == subcategory_id)
     if city:
-        query = query.filter(Order.city.ilike(f"%{city}%"))
+        variants = get_region_variants(city)
+        if len(variants) > 1:
+            from sqlalchemy import or_
+            conditions = [Order.city.ilike(f"%{v}%") for v in variants]
+            query = query.filter(or_(*conditions))
+        else:
+            query = query.filter(Order.city.ilike(f"%{city}%"))
     if search:
         query = query.filter(
             (Order.description.ilike(f"%{search}%")) |
@@ -405,7 +540,7 @@ async def accept_order(
             price=order.price,
             include_lunch=order.include_lunch,
             include_taxi=order.include_taxi,
-            status="accepted",
+            status="pending",
             accepted_at=datetime.now(timezone.utc).replace(tzinfo=None),
             is_company=True # Preserve company flag for UI to show 'Reject' button
         )
@@ -420,11 +555,11 @@ async def accept_order(
         if not order.master_id:
             order.master_id = profile.id
             order.accepted_at = datetime.now(timezone.utc).replace(tzinfo=None)
-            # Start 3-day auto-cancel timer on original announcement
+            # Start 3-minute auto-cancel timer on original announcement
             background_tasks.add_task(auto_cancel_company_order, order.id)
         
-        # Start auto-completion timer for the CHILD order
-        background_tasks.add_task(complete_order_after_delay, final_order.id)
+        # Start auto-reject timer for the CHILD order (application)
+        background_tasks.add_task(auto_reject_company_order_application, final_order.id)
         
     else:
         # Standard logic
@@ -447,18 +582,23 @@ async def accept_order(
     db.refresh(final_order)
     
     # --- INSTANT NOTIFICATION TO CLIENT ---
-    # We notify the client about the acceptance, pointing to the NEW order ID if it's a company one
-    background_tasks.add_task(
-        notification_manager.send_notification,
-        final_order.client_id, "order_accepted",
-        {
-            "order_id": final_order.id,
-            "master_name": user.name or user.phone,
-            "subcategory_name_ru": final_order.subcategory.name_ru,
-            "subcategory_name_uz": final_order.subcategory.name_uz,
-            "is_company": order.is_company # Pass original order's is_company flag for UI context
-        }
-    )
+    # IMPORTANT: Using await directly instead of background_tasks.add_task() because
+    # background_tasks silently drops async coroutines without executing them.
+    notify_data = {
+        "order_id": final_order.id,
+        "master_name": user.name or user.phone,
+        "subcategory_name_ru": final_order.subcategory.name_ru,
+        "subcategory_name_uz": final_order.subcategory.name_uz,
+        "is_company": str(order.is_company)
+    }
+    print(f"NOTIFY: Sending order_accepted to client_id={final_order.client_id}, data={notify_data}")
+    try:
+        await notification_manager.send_notification(
+            final_order.client_id, "order_accepted", notify_data
+        )
+        print(f"NOTIFY: Successfully sent order_accepted to client_id={final_order.client_id}")
+    except Exception as e:
+        print(f"NOTIFY ERROR: Failed to send notification: {e}")
     # ------------------------------
     return build_order_response(final_order, is_subscribed=True, override_master=profile)
 
@@ -500,7 +640,6 @@ def get_my_orders(
                 if (now - acc_at).total_seconds() >= 86400:
                     o.status = "completed"
                     db.commit()
-            
             if o.is_company and o.status == "open":
                 # For company announcements, show the main entry once.
                 # Accepted candidates will show up as separate 'accepted' orders.
@@ -538,6 +677,10 @@ def get_my_orders(
         ).filter(Order.master_id == profile.id).all()
         
         for o in direct_master_orders:
+            # Skip the main company order which was created by someone else and has assignments
+            if o.is_company and o.client_id != user.id and len(o.assignments) > 0:
+                continue
+            
             # Auto-complete check
             if not o.is_company and o.status == "accepted" and o.accepted_at:
                 acc_at = o.accepted_at.replace(tzinfo=None) if o.accepted_at.tzinfo else o.accepted_at
@@ -560,6 +703,8 @@ def get_my_orders(
         
         for assign in assignments:
             o = assign.order
+            if o.is_company:
+                continue
             if (o.id, profile.id) in existing_ids_with_master:
                 continue
             
@@ -757,7 +902,7 @@ async def get_chat_list(
     # We now include 'cancelled' and 'rejected' so users can see the final status/history
     orders = db.query(Order).outerjoin(MasterProfile, Order.master_id == MasterProfile.id).filter(
         ((Order.client_id == current_user.id) | (MasterProfile.user_id == current_user.id)) &
-        (Order.status.in_(["accepted", "completed", "cancelled", "rejected"]))
+        (Order.status.in_(["accepted", "accepted_hr", "completed", "cancelled", "rejected", "vacancy_closed", "pending"]))
     ).all()
     
     print(f"DEBUG: Found {len(orders)} relevant orders for chat list")
@@ -880,17 +1025,19 @@ async def send_chat_message(
     if msg_created_at and msg_created_at.tzinfo is None:
         msg_created_at = msg_created_at.replace(tzinfo=timezone.utc)
 
-    background_tasks.add_task(
-        notification_manager.send_notification,
-        recipient_id, "chat_message",
-        {
-            "order_id": order.id,
-            "sender_id": user.id,
-            "sender_name": user.name,
-            "text": data.text,
-            "created_at": msg_created_at.isoformat()
-        }
-    )
+    try:
+        await notification_manager.send_notification(
+            recipient_id, "chat_message",
+            {
+                "order_id": order.id,
+                "sender_id": user.id,
+                "sender_name": user.name,
+                "text": data.text,
+                "created_at": msg_created_at.isoformat()
+            }
+        )
+    except Exception as e:
+        print(f"NOTIFY ERROR chat_message: {e}")
     
     return msg
 
@@ -924,7 +1071,6 @@ async def cancel_order(
     order.status = "cancelled"
     
     # Reject all pending job applications from this employer
-    # if they are cancelling their search (broadly)
     from models import JobApplication
     pending_apps = db.query(JobApplication).filter(
         JobApplication.employer_id == user.id,
@@ -932,11 +1078,37 @@ async def cancel_order(
     ).all()
     for app in pending_apps:
         app.status = "rejected"
+        
+    # Also find and close ALL pending child orders for this HR announcement
+    if order.is_company:
+        pending_children = db.query(Order).filter(
+            Order.client_id == order.client_id,
+            Order.subcategory_id == order.subcategory_id,
+            Order.is_company == True,
+            Order.status == "pending",
+            Order.id != order.id  # Exclude the parent
+        ).all()
+        for child in pending_children:
+            child.status = "vacancy_closed"  # Вакансия закрыта
+            db.commit()
+            if child.master and child.master.user_id:
+                try:
+                    await notification_manager.send_notification(
+                        child.master.user_id, "vacancy_closed",
+                        {
+                            "order_id": child.id,
+                            "client_name": user.name,
+                            "subcategory_name_ru": order.subcategory.name_ru if order.subcategory else "",
+                            "subcategory_name_uz": order.subcategory.name_uz if order.subcategory else "",
+                        }
+                    )
+                except Exception:
+                    pass
 
     db.commit()
 
     # Notify master about cancellation
-    if order.master_id:
+    if order.master_id and not order.is_company:
         master_user = db.query(User).join(MasterProfile).filter(MasterProfile.id == order.master_id).first()
         if master_user:
             await notification_manager.send_notification(
@@ -994,6 +1166,92 @@ async def reject_master(
             )
             
     return MessageResponse(message="Мастер успешно отклонен")
+
+
+@router.put("/{order_id}/hr-accept", response_model=MessageResponse)
+async def hr_accept_master(
+    order_id: int,
+    authorization: str = Header(""),
+    db: Session = Depends(get_db)
+):
+    """
+    Employer formally accepts a master's application to an HR order.
+    Sets the child order status to 'accepted' (Принято).
+    """
+    user = get_current_user_from_header(authorization, db)
+    order = db.query(Order).filter(Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    
+    if order.client_id != user.id:
+        raise HTTPException(status_code=403, detail="Вы не можете управлять чужим заказом")
+        
+    if order.status == "accepted_hr":
+        return MessageResponse(message="Мастер уже принят на работу")
+        
+    if order.status in ("vacancy_closed", "rejected", "cancelled"):
+        raise HTTPException(status_code=400, detail="Невозможно принять мастера в этом статусе")
+
+    order.status = "accepted_hr"  # Принято (вместо completed)
+    db.commit()
+    
+    # Notify master about acceptance
+    if order.master_id:
+        master_user = db.query(User).join(MasterProfile).filter(MasterProfile.id == order.master_id).first()
+        if master_user:
+            asyncio.create_task(
+                notification_manager.send_notification(
+                    master_user.id, "hr_accepted",
+                    {
+                        "order_id": order.id,
+                        "client_name": user.name,
+                        "subcategory_name_ru": order.subcategory.name_ru,
+                        "subcategory_name_uz": order.subcategory.name_uz,
+                    }
+                )
+            )
+            
+    return MessageResponse(message="Мастер успешно принят на работу")
+
+
+@router.post("/{order_id}/extend-hr", response_model=MessageResponse)
+async def extend_hr_announcement(
+    order_id: int,
+    background_tasks: BackgroundTasks,
+    authorization: str = Header(""),
+    db: Session = Depends(get_db)
+):
+    """
+    HR employer extends the active announcement by 5 more minutes.
+    Can be called after receiving the 'hr_expiry_warning' notification.
+    """
+    user = get_current_user_from_header(authorization, db)
+    order = db.query(Order).filter(Order.id == order_id).first()
+    
+    if not order:
+        raise HTTPException(status_code=404, detail="Заказ не найден")
+    
+    if order.client_id != user.id:
+        raise HTTPException(status_code=403, detail="Вы не можете управлять чужим заказом")
+    
+    if not order.is_company:
+        raise HTTPException(status_code=400, detail="Продление возможно только для HR-объявлений")
+    
+    if order.status != "open":
+        raise HTTPException(status_code=400, detail="Объявление уже завершено или закрыто")
+    
+    # Shift created_at by 5 minutes forward to extend the deadline
+    from datetime import timedelta
+    if order.created_at:
+        order.created_at = order.created_at + timedelta(minutes=5)
+        db.commit()
+
+    # The background task is already running in a while loop. 
+    # It will automatically detect the new created_at and adjust its sleep time!
+    
+    print(f"EXTEND: HR announcement {order_id} extended by 5 minutes by user {user.id}")
+    return MessageResponse(message="Объявление продлено на 5 минут")
 
 
 @router.put("/{order_id}/cancel-others", response_model=MessageResponse)

@@ -14,6 +14,7 @@ import '../../widgets/full_screen_image.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/formatters.dart';
 import '../../services/auth_service.dart';
+import '../../config/regions.dart';
 import '../../models/order.dart';
 import 'chat_screen.dart';
 
@@ -38,10 +39,6 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
   String _searchQuery = '';
   String? _selectedSearchCity;
 
-  final List<String> _uzbekistanCities = [
-    'Toshkent', 'Samarqand', 'Buxoro', 'Andijon', 'Namangan', 'Farg\'ona', 
-    'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
-  ];
   final _searchController = TextEditingController();
 
 
@@ -83,16 +80,12 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
       final res = await widget.apiService.acceptOrder(orderId);
       
       if (mounted) {
-        // Navigate to Chat
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ChatScreen(
-              order: res,
-              apiService: widget.apiService,
-              currentUserId: widget.authService.currentUser?.id ?? 0,
+        // Show success snackbar
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(AppStrings.isRu ? 'Заказ успешно принят!' : 'Buyurtma muvaffaqiyatli qabul qilindi!'),
+              backgroundColor: Colors.green,
             ),
-          ),
         );
         _loadOrders();
       }
@@ -358,10 +351,11 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               ],
             ),
           ),
-          ..._uzbekistanCities.map((String city) {
-            final isSelected = _selectedSearchCity == city;
+          ...RegionsConfig.regionKeys.map((String key) {
+            final displayName = RegionsConfig.getDisplayName(key);
+            final isSelected = _selectedSearchCity == displayName;
             return PopupMenuItem<String?>(
-              value: city,
+              value: displayName,
               child: Row(
                 children: [
                   Icon(
@@ -371,7 +365,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    city,
+                    displayName,
                     style: TextStyle(
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected ? theme.primaryColor : theme.textTheme.bodyLarge?.color,
@@ -575,7 +569,20 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
             Text(
               order['description'],
               style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
+            if ((order['description'] as String).length > 120)
+              GestureDetector(
+                onTap: () => _showOrderDetail(order),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    AppStrings.isRu ? 'Подробнее →' : 'Batafsil →',
+                    style: TextStyle(color: theme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             _buildOptionsRow(order),
             const SizedBox(height: 16),
@@ -691,6 +698,111 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _showOrderDetail(dynamic order) {
+    final theme = Theme.of(context);
+    final subName = AppStrings.isRu ? order['subcategory_name_ru'] : order['subcategory_name_uz'];
+    final date = DateTimeUtils.parseUtc(order['created_at']);
+    final formattedDate = DateTimeUtils.formatFull(date);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardTheme.color,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.75,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      subName,
+                      style: TextStyle(color: theme.primaryColor, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  Text(formattedDate, style: TextStyle(color: theme.hintColor, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.location_on_rounded, color: theme.hintColor, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${order['city']}${order['district'] != null ? ', ${order['district']}' : ''}',
+                    style: TextStyle(color: theme.hintColor, fontSize: 14),
+                  ),
+                ],
+              ),
+              if (order['price'] != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${PriceFormatter.format(order['price'])} ${AppStrings.sum}',
+                  style: TextStyle(color: theme.textTheme.titleLarge?.color, fontSize: 18, fontWeight: FontWeight.w700),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Divider(color: theme.dividerColor.withOpacity(0.2)),
+              const SizedBox(height: 12),
+              Text(
+                AppStrings.isRu ? 'Описание' : 'Tavsif',
+                style: TextStyle(color: theme.hintColor, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: controller,
+                  child: Text(
+                    order['description'],
+                    style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15, height: 1.6),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: GradientButton(
+                  text: order['is_company'] == true
+                      ? (AppStrings.isRu ? 'Откликнуться' : 'Murojaat qilish')
+                      : (AppStrings.isRu ? 'Принять' : 'Qabul qilish'),
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    if (order['can_chat'] == false) {
+                      _showSubscriptionRequired();
+                      return;
+                    }
+                    _acceptOrder(order['id']);
+                  },
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

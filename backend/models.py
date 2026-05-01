@@ -238,7 +238,9 @@ class PaymentTransaction(Base):
     plan_name = Column(String(50), nullable=False)
     role = Column(String(20), nullable=False)
     status = Column(String(20), default="pending")  # pending, success, failed, cancelled
+    cancel_reason = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     completed_at = Column(DateTime, nullable=True)
+    cancel_time = Column(DateTime, nullable=True)
 
     user = relationship("User")

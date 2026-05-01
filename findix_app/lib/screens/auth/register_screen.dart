@@ -16,7 +16,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
+  final _phoneController = TextEditingController(text: '+998 ');
   final _passwordController = TextEditingController();
   final _phoneFormatter = PhoneUtils.maskFormatter;
   bool _isLoading = false;
@@ -41,6 +41,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       setState(() => _error = 'Введите номер телефона и пароль');
       return;
     }
+    // Phone digit count check: must have exactly 9 digits after 998
+    final digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    // digits starts with '998' (3 digits) + 9 subscriber digits = 12 total
+    if (digits.length < 12) {
+      setState(() => _error = AppStrings.isRu
+          ? 'Номер телефона должен содержать ровно 9 цифр (после +998)'
+          : 'Telefon raqami +998 dan keyin aynan 9 ta raqam bo\'lishi kerak');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
@@ -48,7 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await widget.authService.register(
         name: _nameController.text.isEmpty ? null : _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
+        phone: PhoneUtils.normalize(_phoneController.text),
         password: _passwordController.text,
         role: 'client',
         city: null,

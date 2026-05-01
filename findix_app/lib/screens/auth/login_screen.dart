@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _phoneController = TextEditingController();
+  final _phoneController = TextEditingController(text: '+998 ');
   final _passwordController = TextEditingController();
   final _phoneFormatter = PhoneUtils.maskFormatter;
   bool _isLoading = false;
@@ -27,13 +27,21 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = 'Заполните все поля');
       return;
     }
+    // Phone digit count check: must have exactly 9 digits after 998
+    final digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length < 12) {
+      setState(() => _error = AppStrings.isRu
+          ? 'Номер телефона должен содержать ровно 9 цифр (после +998)'
+          : 'Telefon raqami +998 dan keyin aynan 9 ta raqam bo\'lishi kerak');
+      return;
+    }
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
       await widget.authService.login(
-        _phoneController.text.trim(),
+        PhoneUtils.normalize(_phoneController.text),
         _passwordController.text,
       );
       if (mounted) Navigator.pushReplacementNamed(context, '/home');

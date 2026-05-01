@@ -297,11 +297,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _infoTile(Icons.work_history_rounded, AppStrings.experience, '${_masterProfile!.experienceYears} ${AppStrings.years}'),
                       if (_masterProfile!.hourlyRate != null)
                         _infoTile(Icons.payments_rounded, AppStrings.hourlyRate, '${_masterProfile!.hourlyRate!.toStringAsFixed(0)} ${AppStrings.sum}${AppStrings.perHour}'),
-                      if (_masterProfile!.city == 'Toshkent' && _masterProfile!.district != null)
+                      if (_masterProfile!.district != null && _masterProfile!.district!.isNotEmpty)
                         _infoTile(Icons.location_on_rounded, AppStrings.isRu ? 'Район' : 'Tuman', _masterProfile!.district!),
                       
-                      // For non-Tashkent cities, show address. For Tashkent, hide address if district is present.
-                      if (_masterProfile!.city != 'Toshkent' && _masterProfile!.address != null && _masterProfile!.address!.isNotEmpty)
+                      if (_masterProfile!.address != null && _masterProfile!.address!.isNotEmpty)
                         _infoTile(Icons.map_rounded, AppStrings.isRu ? 'Адрес' : 'Manzil', _masterProfile!.address!),
                       
                       if (_masterProfile!.skills.isNotEmpty)

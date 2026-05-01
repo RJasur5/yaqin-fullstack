@@ -10,7 +10,7 @@ import '../widgets/gradient_button.dart';
 import '../widgets/full_screen_image.dart';
 import '../utils/phone_utils.dart';
 import '../utils/formatters.dart';
-
+import '../config/regions.dart';
 class MasterDetailScreen extends StatefulWidget {
   final ApiService apiService;
   final int masterId;
@@ -114,9 +114,10 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
   void _showJobApplicationDialog() {
     final theme = Theme.of(context);
     final descController = TextEditingController();
-    final phoneController = TextEditingController();
+    final phoneController = TextEditingController(text: '+998 ');
     final _phoneFormatter = PhoneUtils.maskFormatter;
-    final cityController = TextEditingController();
+    String? selectedCity;
+    String? selectedDistrict;
     bool isSending = false;
 
     showModalBottomSheet(
@@ -200,16 +201,62 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
               ),
               const SizedBox(height: 14),
               // City field
-              TextField(
-                controller: cityController,
-                style: theme.textTheme.bodyLarge,
-                decoration: InputDecoration(
-                  hintText: AppStrings.isRu ? 'Город' : 'Shahar',
-                  labelText: AppStrings.city,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                  prefixIcon: const Icon(Icons.location_on_rounded),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: theme.cardTheme.color,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: selectedCity,
+                    hint: Text(AppStrings.city, style: TextStyle(color: theme.hintColor)),
+                    dropdownColor: theme.cardTheme.color,
+                    items: RegionsConfig.regionKeys.map((key) {
+                      return DropdownMenuItem<String>(
+                        value: key,
+                        child: Text(RegionsConfig.getDisplayName(key), style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setModalState(() { selectedCity = val; selectedDistrict = null; });
+                    },
+                  ),
                 ),
               ),
+              const SizedBox(height: 14),
+              // District field
+              if (selectedCity != null && RegionsConfig.getDistricts(selectedCity!).isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: theme.cardTheme.color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: theme.dividerColor.withOpacity(0.5)),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: selectedDistrict,
+                      hint: Text(AppStrings.isRu ? 'Район' : 'Tuman', style: TextStyle(color: theme.hintColor)),
+                      dropdownColor: theme.cardTheme.color,
+                      items: RegionsConfig.getDistricts(selectedCity!).map((displayName) {
+                        final key = RegionsConfig.getDistrictKey(displayName, selectedCity);
+                        return DropdownMenuItem<String>(
+                          value: key,
+                          child: Text(displayName, style: TextStyle(color: theme.textTheme.bodyLarge?.color)),
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        setModalState(() => selectedDistrict = val);
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               const SizedBox(height: 14),
               // Phone field
               TextField(
@@ -240,13 +287,29 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                     );
                     return;
                   }
+                  if (selectedCity == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(AppStrings.isRu ? 'Выберите город' : 'Shaharni tanlang')),
+                    );
+                    return;
+                  }
+                  if (RegionsConfig.getDistricts(selectedCity!).isNotEmpty && selectedDistrict == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(AppStrings.isRu ? 'Выберите район' : 'Tumanni tanlang')),
+                    );
+                    return;
+                  }
+                  
                   setModalState(() => isSending = true);
                   try {
+                    final cityDisplay = selectedCity != null ? RegionsConfig.getDisplayName(selectedCity!) : '';
+                    final districtDisplay = selectedDistrict != null ? RegionsConfig.getDistrictDisplay(selectedDistrict!, selectedCity) : null;
+                    String fullCity = districtDisplay != null ? '$cityDisplay, $districtDisplay' : cityDisplay;
                     await widget.apiService.createJobApplication(
                       widget.masterId,
                       description: descController.text.trim(),
-                      city: cityController.text.trim().isNotEmpty ? cityController.text.trim() : null,
-                      phone: phoneController.text.trim().isNotEmpty ? phoneController.text.trim() : null,
+                      city: fullCity,
+                      phone: phoneController.text.trim().isNotEmpty ? PhoneUtils.normalize(phoneController.text) : null,
                     );
                     if (mounted) {
                       Navigator.pop(ctx);

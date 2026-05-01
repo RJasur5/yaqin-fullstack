@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     PAYME_TEST_KEY: str = os.getenv("PAYME_TEST_KEY", "")
     PAYME_USE_TEST: bool = os.getenv("PAYME_USE_TEST", "true").lower() == "true"
 
+    # Paynet Payment
+    PAYNET_LOGIN: str = os.getenv("PAYNET_LOGIN", "yaqingo")
+    PAYNET_PASSWORD: str = os.getenv("PAYNET_PASSWORD", "ZxCvBn")
+    PAYNET_SERVICE_ID: str = os.getenv("PAYNET_SERVICE_ID", "155")
+
     class Config:
         env_file = ".env"
         extra = "ignore"

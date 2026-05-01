@@ -45,6 +45,9 @@ class FCMService:
                     title=title,
                     body=body,
                 ),
+                android=messaging.AndroidConfig(
+                    priority="high",
+                ),
                 data=data or {},
                 token=token,
             )
