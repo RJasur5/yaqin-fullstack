@@ -34,7 +34,11 @@ class NotificationService {
     if (kIsWeb) return; 
 
     // Initialize Firebase if not already initialized
-    await Firebase.initializeApp();
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase already initialized or error: $e');
+    }
 
     // Set background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -55,13 +59,33 @@ class NotificationService {
        );
     }
 
-    // Retrieve and register FCM Token
-    String? token = await FirebaseMessaging.instance.getToken();
-    if (token != null && authService != null) {
-       print("FCM Token: $token");
-       await authService.updateFCMToken(token);
-    }
-
+    // Fetch FCM Token asynchronously to not block app launch
+    // Fetch FCM Token asynchronously to not block app launch
+    () async {
+      try {
+        if (Platform.isIOS) {
+          String? apnsToken;
+          // Wait up to 30 seconds for APNS token asynchronously without blocking app launch
+          for (int i = 0; i < 30; i++) {
+            await Future.delayed(const Duration(seconds: 1));
+            apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+            if (apnsToken != null) break;
+          }
+          if (apnsToken == null) {
+            print("APNS token is still null after 30s. Push notifications won't work.");
+            return;
+          }
+          print("APNS Token acquired: $apnsToken");
+        }
+        String? token = await FirebaseMessaging.instance.getToken();
+        if (token != null && authService != null) {
+           print("FCM Token: $token");
+           await authService.updateFCMToken(token);
+        }
+      } catch (e) {
+        print("Error getting FCM token: $e");
+      }
+    }();
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       // System notification suppressed in foreground as requested.

@@ -172,7 +172,6 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
       decoration: BoxDecoration(gradient: AppTheme.currentGradient(context)),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(AppStrings.isRu ? 'Доступные заказы' : 'Mavjud buyurtmalar'),
           backgroundColor: Colors.transparent,
@@ -182,9 +181,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
             IconButton(onPressed: _loadOrders, icon: const Icon(Icons.refresh_rounded)),
           ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.only(top: 80),
-          child: Column(
+        body: Column(
             children: [
               _buildSearchAndFilters(),
               Expanded(
@@ -207,7 +204,6 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               ),
             ],
           ),
-        ),
       ),
     );
   }

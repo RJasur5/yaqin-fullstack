@@ -119,7 +119,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       decoration: BoxDecoration(gradient: AppTheme.currentGradient(context)),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(AppStrings.isRu ? 'Подать объявление' : 'E\'lon berish'),
           backgroundColor: Colors.transparent,
@@ -129,7 +128,7 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
         body: _isLoading 
             ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
             : SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 100, left: 20, right: 20, bottom: 20),
+                padding: const EdgeInsets.only(top: 8, left: 20, right: 20, bottom: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

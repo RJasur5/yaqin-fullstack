@@ -29,9 +29,32 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+
+import 'dart:io' show Platform;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  try {
+    if (Platform.isIOS) {
+      await Firebase.initializeApp(
+        options: const FirebaseOptions(
+          apiKey: 'AIzaSyBZrldZPvp09YIdYZgvag0MoKX7vH-6geQ',
+          appId: '1:973494872827:ios:bc3affd0198c66bba9de5e',
+          messagingSenderId: '973494872827',
+          projectId: 'yaqin-app-22180',
+          storageBucket: 'yaqin-app-22180.firebasestorage.app',
+          iosBundleId: 'com.yaqin.findix',
+        ),
+      );
+    } else {
+      await Firebase.initializeApp();
+    }
+  } catch (e) {
+    debugPrint('Firebase initialization error in main: $e');
+  }
+
   // Initialize services
   final apiService = ApiService();
   final authService = AuthService(apiService);
@@ -43,15 +66,15 @@ void main() async {
     apiService.setToken(token);
   }
   
-  // Initialize notification service for UI alerts and FCM
-  await NotificationService.instance.init(authService: authService);
+  // Initialize notification service for UI alerts and FCM (async)
+  NotificationService.instance.init(authService: authService);
   
   // Initialize Theme Service
   final themeService = ThemeService();
   await themeService.init();
   
-  // Initialize Background Service
-  await initializeService();
+  // Initialize Background Service (async)
+  initializeService();
 
   // Initialize Date Formatting
   await initializeDateFormatting('ru', null);

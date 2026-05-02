@@ -59,7 +59,6 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
       ),
-      extendBodyBehindAppBar: true,
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -83,7 +82,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
     final joinDate = DateTimeUtils.formatMonthYear(createdAt, 'ru');
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 100, 20, 20),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
       child: Column(
         children: [
           // Header Card

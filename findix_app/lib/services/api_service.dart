@@ -92,11 +92,15 @@ class ApiService {
     throw Exception(msg);
   }
 
-  Future<void> updateFCMToken(String token) async {
+  Future<void> updateFCMToken(String token, {String? apnsToken}) async {
+    final body = {'fcm_token': token};
+    if (apnsToken != null) {
+      body['apns_token'] = apnsToken;
+    }
     final res = await http.post(
       Uri.parse(ApiConfig.authFcmToken),
       headers: _headers,
-      body: jsonEncode({'fcm_token': token}),
+      body: jsonEncode(body),
     ).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {
       throw Exception('Failed to update FCM token');

@@ -152,7 +152,6 @@ class _AppReviewsScreenState extends State<AppReviewsScreen> {
         
         return Scaffold(
           backgroundColor: Colors.transparent,
-          extendBodyBehindAppBar: true,
           appBar: AppBar(
             centerTitle: true,
             title: Text(

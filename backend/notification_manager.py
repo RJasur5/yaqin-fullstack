@@ -28,23 +28,33 @@ class NotificationManager:
         # 2. Try WebSocket delivery (for foreground app)
         await manager.send_personal_message(ws_payload, user_id)
 
-        # 3. Try FCM Push delivery (for background/terminated app)
+        # 3. Try Push delivery (for background/terminated app)
         db = SessionLocal()
         try:
             user = db.query(User).filter(User.id == user_id).first()
-            if user and user.fcm_token:
-                # Generate user-friendly title/body based on type
+            if user:
                 title, body = NotificationManager._get_notif_content(user, type, payload_data)
                 
-                # Send push
-                await fcm_service.send_push_notification(
-                    token=user.fcm_token,
-                    title=title,
-                    body=body,
-                    data={"type": type, "payload": json.dumps(payload_data)}
-                )
+                # Try direct APNs first if we have the token
+                apns_success = False
+                if user.apns_token:
+                    apns_success = await fcm_service.send_apns_push(
+                        apns_token=user.apns_token,
+                        title=title,
+                        body=body,
+                        data={"type": type, "payload": json.dumps(payload_data)}
+                    )
+                
+                # If APNs failed (or we only have FCM token), try FCM
+                if not apns_success and user.fcm_token:
+                    await fcm_service.send_push_notification(
+                        token=user.fcm_token,
+                        title=title,
+                        body=body,
+                        data={"type": type, "payload": json.dumps(payload_data)}
+                    )
         except Exception as e:
-            logger.error(f"NotificationManager: Failed to send FCM for user {user_id}: {e}")
+            logger.error(f"NotificationManager: Failed to send Push for user {user_id}: {e}")
         finally:
             db.close()
 

@@ -203,7 +203,6 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
       decoration: BoxDecoration(gradient: AppTheme.currentGradient(context)),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(AppStrings.isRu ? 'Мои заказы' : 'Mening buyurtmalarim'),
           backgroundColor: Colors.transparent,
@@ -218,7 +217,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
             : _orders.isEmpty
                 ? _buildEmptyState()
                 : ListView.builder(
-                    padding: const EdgeInsets.only(top: 100, left: 16, right: 16, bottom: 100),
+                    padding: const EdgeInsets.only(top: 8, left: 16, right: 16, bottom: 100),
                     itemCount: _orders.length,
                     itemBuilder: (context, index) {
                       final order = _orders[index];

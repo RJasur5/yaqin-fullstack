@@ -31,6 +31,7 @@ class UserLogin(BaseModel):
 
 class FCMTokenUpdate(BaseModel):
     fcm_token: str
+    apns_token: Optional[str] = None
 
 
 

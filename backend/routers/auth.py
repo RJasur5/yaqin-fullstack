@@ -241,8 +241,10 @@ def update_fcm_token(
     user: User = Depends(get_current_user_from_header),
     db: Session = Depends(get_db)
 ):
-    """Update user's FCM token for push notifications."""
+    """Update user's FCM token and APNs token for push notifications."""
     user.fcm_token = data.fcm_token
+    if hasattr(data, 'apns_token') and data.apns_token:
+        user.apns_token = data.apns_token
     db.commit()
     return MessageResponse(message="FCM token updated successfully")
 

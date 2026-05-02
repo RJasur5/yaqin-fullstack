@@ -206,7 +206,6 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
       decoration: BoxDecoration(gradient: AppTheme.currentGradient(context)),
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(AppStrings.isRu ? 'Профиль мастера' : 'Mutaxassis profili'),
           backgroundColor: Colors.transparent,
@@ -216,7 +215,7 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
         body: _isLoading 
             ? Center(child: CircularProgressIndicator(color: theme.primaryColor))
             : SingleChildScrollView(
-                padding: const EdgeInsets.only(top: 100, left: 20, right: 20, bottom: 40),
+                padding: const EdgeInsets.only(top: 8, left: 20, right: 20, bottom: 40),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

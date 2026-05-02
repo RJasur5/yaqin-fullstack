@@ -375,10 +375,6 @@ async def create_order(
             # Skip if it's the creator
             if m.user_id == user.id:
                 continue
-                
-            # Skip if not online
-            if m.user_id not in online_user_ids:
-                continue
             
             # Normalize names to handle Ru/Uz language differences
             order_city_norm = normalize_region_name(order.city) if order.city else ""

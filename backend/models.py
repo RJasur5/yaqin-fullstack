@@ -23,6 +23,7 @@ class User(Base):
     is_blocked = Column(Boolean, default=False)
     is_trial_used = Column(Boolean, default=False)
     fcm_token = Column(String(255), nullable=True)
+    apns_token = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     master_profile = relationship("MasterProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
