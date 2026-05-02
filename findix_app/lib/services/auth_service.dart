@@ -3,6 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import '../models/user.dart';
 import 'api_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'dart:io' show Platform;
 
 class AuthService {
   static const _tokenKey = 'yaqin_token';
@@ -59,6 +61,40 @@ class AuthService {
       FlutterBackgroundService().invoke('updateConfig', {'userId': user.id});
     } catch (e) {
       debugPrint('AuthService: Failed to notify background service: $e');
+    }
+    
+    // Register FCM and APNs token after login with retry loop for iOS
+    try {
+      String? fcmToken;
+      String? apnsToken;
+      for (int i = 0; i < 15; i++) {
+        try {
+          fcmToken = await FirebaseMessaging.instance.getToken();
+          if (Platform.isIOS) {
+            apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+          }
+        } catch (e) {
+          debugPrint('FCM Token error: $e. Retrying...');
+        }
+        
+        if (fcmToken != null) {
+          if (Platform.isIOS) {
+             if (apnsToken != null || i >= 5) break; // wait at most 10 seconds for apns
+          } else {
+             break;
+          }
+        }
+        await Future.delayed(const Duration(seconds: 2));
+      }
+      
+      debugPrint('AuthService: FCM=$fcmToken, APNS=$apnsToken');
+      if (fcmToken != null) {
+        await updateFCMToken(fcmToken, apnsToken: apnsToken);
+      } else {
+        debugPrint('AuthService: Still failed to get FCM token.');
+      }
+    } catch (e) {
+      debugPrint('AuthService: Fatal error getting FCM token after login: $e');
     }
   }
 
@@ -118,10 +154,10 @@ class AuthService {
     }
   }
 
-  Future<void> updateFCMToken(String fcmToken) async {
+  Future<void> updateFCMToken(String fcmToken, {String? apnsToken}) async {
     if (token == null) return;
     try {
-      await api.updateFCMToken(fcmToken);
+      await api.updateFCMToken(fcmToken, apnsToken: apnsToken);
       debugPrint('AuthService: FCM Token updated successfully');
     } catch (e) {
       debugPrint('AuthService: Failed to update FCM token on backend: $e');
