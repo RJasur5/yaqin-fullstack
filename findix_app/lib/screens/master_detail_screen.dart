@@ -119,6 +119,21 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
     String? selectedCity;
     String? selectedDistrict;
     bool isSending = false;
+    String? descError;
+    String? phoneError;
+
+    void protectPrefix() {
+      const prefix = '+998 ';
+      if (!phoneController.text.startsWith(prefix)) {
+        phoneController.removeListener(protectPrefix);
+        phoneController.text = prefix;
+        phoneController.selection = TextSelection.fromPosition(
+          TextPosition(offset: prefix.length),
+        );
+        phoneController.addListener(protectPrefix);
+      }
+    }
+    phoneController.addListener(protectPrefix);
 
     showModalBottomSheet(
       context: context,
@@ -190,11 +205,17 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
               // Description field
               TextField(
                 controller: descController,
-                maxLines: 4,
+                minLines: 4,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
                 style: theme.textTheme.bodyLarge,
+                onChanged: (_) {
+                  if (descError != null) setModalState(() => descError = null);
+                },
                 decoration: InputDecoration(
                   hintText: AppStrings.applicationDescription,
                   labelText: AppStrings.isRu ? 'Описание работы *' : 'Ish tavsifi *',
+                  errorText: descError,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   prefixIcon: const Icon(Icons.description_rounded),
                 ),
@@ -264,9 +285,13 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                 keyboardType: TextInputType.phone,
                 inputFormatters: [_phoneFormatter],
                 style: theme.textTheme.bodyLarge,
+                onChanged: (_) {
+                  if (phoneError != null) setModalState(() => phoneError = null);
+                },
                 decoration: InputDecoration(
                   hintText: '+998 (99) 858-56-88',
                   labelText: AppStrings.applicationPhone,
+                  errorText: phoneError,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                   prefixIcon: const Icon(Icons.phone_rounded),
                 ),
@@ -279,14 +304,24 @@ class _MasterDetailScreenState extends State<MasterDetailScreen> {
                     : AppStrings.submitApplication,
                 icon: Icons.send_rounded,
                 onPressed: isSending ? null : () async {
+                  bool hasError = false;
+                  setModalState(() {
+                    descError = null;
+                    phoneError = null;
+                  });
+
                   if (descController.text.trim().length < 5) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(AppStrings.isRu
-                          ? 'Опишите работу (минимум 5 символов)'
-                          : 'Ishni tavsiflang (kamida 5 belgi)')),
-                    );
-                    return;
+                    setModalState(() => descError = AppStrings.isRu ? 'Минимум 5 символов' : 'Kamida 5 ta belgi');
+                    hasError = true;
                   }
+                  final cleanPhone = phoneController.text.replaceAll(RegExp(r'\D'), '');
+                  if (cleanPhone.length < 12) { // e.g. 998901234567
+                    setModalState(() => phoneError = AppStrings.isRu ? 'Некорректный номер телефона' : 'Noto\'g\'ri telefon raqami');
+                    hasError = true;
+                  }
+
+                  if (hasError) return;
+
                   if (selectedCity == null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text(AppStrings.isRu ? 'Выберите город' : 'Shaharni tanlang')),

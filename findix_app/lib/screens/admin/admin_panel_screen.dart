@@ -140,6 +140,12 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             isHighlight: true,
           ),
           _StatCard(
+            title: AppStrings.isRu ? 'Доступные заказы' : 'Mavjud buyurtmalar',
+            value: '${_stats!['available_orders'] ?? 0}',
+            icon: Icons.assignment_outlined,
+            palette: palette,
+          ),
+          _StatCard(
             title: AppStrings.isRu ? 'Всего заказов' : 'Jami buyurtmalar',
             value: '${_stats!['total_orders']}',
             icon: Icons.shopping_basket_outlined,

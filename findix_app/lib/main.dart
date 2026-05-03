@@ -23,6 +23,8 @@ import 'services/theme_service.dart';
 import 'screens/orders/chat_list_screen.dart';
 import 'screens/job_applications_screen.dart';
 import 'screens/profile_screen.dart';
+import 'services/connectivity_service.dart';
+import 'widgets/no_internet_banner.dart';
 import 'dart:async';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -79,6 +81,9 @@ void main() async {
   // Initialize Date Formatting
   await initializeDateFormatting('ru', null);
   await initializeDateFormatting('uz', null);
+
+  // Initialize Connectivity Service
+  await ConnectivityService.instance.init();
 
   runApp(YaqinApp(apiService: apiService, authService: authService, themeService: themeService));
 }
@@ -200,6 +205,7 @@ class YaqinApp extends StatelessWidget {
           navigatorKey: YaqinApp.navigatorKey,
           debugShowCheckedModeBanner: false,
           title: 'Yaqin',
+          builder: (context, child) => NoInternetBanner(child: child!),
           theme: AppTheme.getTheme(mode),
           themeMode: ThemeMode.light, // Force the specific selected mode
           initialRoute: '/',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../config/localization.dart';
@@ -555,9 +556,43 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               children: [
                 Icon(Icons.location_on_rounded, color: theme.textTheme.bodyMedium?.color, size: 14),
                 const SizedBox(width: 4),
-                Text(
-                  '${order['city']}, ${order['district'] ?? ''}',
-                  style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                Expanded(
+                  child: Text(
+                    '${order['city']}, ${order['district'] ?? ''}',
+                    style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    String query;
+                    if (order['lat'] != null && order['lon'] != null) {
+                      query = '${order['lat']},${order['lon']}';
+                    } else {
+                      query = '${order['city']} ${order['district'] ?? ''}'.trim();
+                    }
+                    final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+                    try {
+                      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                    } catch (e) {
+                      debugPrint('Could not launch map: $e');
+                    }
+                  },
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.map_rounded, size: 14, color: Colors.blue),
+                      const SizedBox(width: 4),
+                      Text(
+                        AppStrings.isRu ? 'На карте' : 'Xaritada',
+                        style: const TextStyle(
+                          color: Colors.blue,
+                          fontSize: 13,
+                          decoration: TextDecoration.underline,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -568,7 +603,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-            if ((order['description'] as String).length > 120)
+            
               GestureDetector(
                 onTap: () => _showOrderDetail(order),
                 child: Padding(
@@ -637,6 +672,7 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
                              builder: (ctx) => ClientProfileScreen(
                                clientId: order['client_id'],
                                apiService: widget.apiService,
+                               hidePhone: true,
                              ),
                            ),
                          );
@@ -749,9 +785,43 @@ class _AvailableOrdersScreenState extends State<AvailableOrdersScreen> {
                 children: [
                   Icon(Icons.location_on_rounded, color: theme.hintColor, size: 16),
                   const SizedBox(width: 4),
-                  Text(
-                    '${order['city']}${order['district'] != null ? ', ${order['district']}' : ''}',
-                    style: TextStyle(color: theme.hintColor, fontSize: 14),
+                  Expanded(
+                    child: Text(
+                      '${order['city']}${order['district'] != null ? ', ${order['district']}' : ''}',
+                      style: TextStyle(color: theme.hintColor, fontSize: 14),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      String query;
+                      if (order['lat'] != null && order['lon'] != null) {
+                        query = '${order['lat']},${order['lon']}';
+                      } else {
+                        query = '${order['city']} ${order['district'] ?? ''}'.trim();
+                      }
+                      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+                      try {
+                        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                      } catch (e) {
+                        debugPrint('Could not launch map: $e');
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.map_rounded, size: 14, color: Colors.blue),
+                        const SizedBox(width: 4),
+                        Text(
+                          AppStrings.isRu ? 'На карте' : 'Xaritada',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontSize: 13,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

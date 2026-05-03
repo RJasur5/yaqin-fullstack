@@ -26,11 +26,13 @@ def get_admin_stats(
     """Get system-wide statistics for the admin dashboard."""
     total_users = db.query(User).count()
     total_orders = db.query(Order).count()
+    available_orders = db.query(Order).filter(Order.status == 'open').count()
     online_users = manager.get_active_users_count()
     
     return {
         "total_users": total_users,
         "total_orders": total_orders,
+        "available_orders": available_orders,
         "online_users": online_users
     }
 

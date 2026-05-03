@@ -138,6 +138,8 @@ class Order(Base):
     description = Column(Text, nullable=False)
     city = Column(String(100), nullable=False)
     district = Column(String(100), nullable=True)
+    lat = Column(Float, nullable=True)
+    lon = Column(Float, nullable=True)
     price = Column(Float, nullable=True)
     status = Column(String(20), default="open")  # open, accepted, completed, cancelled
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))

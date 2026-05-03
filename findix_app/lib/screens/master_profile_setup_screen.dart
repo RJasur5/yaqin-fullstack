@@ -430,7 +430,8 @@ class _MasterProfileSetupScreenState extends State<MasterProfileSetupScreen> {
                     // Description
                     TextField(
                       controller: _descController,
-                      maxLines: 4,
+                      minLines: 4,
+                      maxLines: null,
                       style: TextStyle(color: theme.textTheme.bodyLarge?.color),
                       decoration: InputDecoration(
                         labelText: AppStrings.description,

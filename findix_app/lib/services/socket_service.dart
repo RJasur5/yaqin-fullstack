@@ -138,7 +138,7 @@ class SocketService {
           id: data['order_id'] ?? DateTime.now().millisecondsSinceEpoch,
           title: '✅ Yaqin',
           body: AppStrings.orderCompleted,
-          data: {'type': 'my_orders'},
+          data: {'type': 'order_completed'},
         );
       } else if (data['type'] == 'order_rejected' || data['type'] == 'order_cancelled' || data['type'] == 'vacancy_closed') {
         _messageController.add(data); // BROADCAST TO UI

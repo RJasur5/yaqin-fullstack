@@ -272,6 +272,8 @@ class OrderCreate(BaseModel):
     description: str
     city: str
     district: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     price: Optional[float] = None
     include_lunch: bool = False
     include_taxi: bool = False
@@ -296,6 +298,8 @@ class OrderResponse(BaseModel):
     description: str
     city: str
     district: Optional[str] = None
+    lat: Optional[float] = None
+    lon: Optional[float] = None
     price: Optional[float] = None
     status: str
     created_at: datetime

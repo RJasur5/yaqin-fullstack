@@ -410,10 +410,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
               style: const TextStyle(color: AppColors.textHint, fontSize: 12),
             ),
             const SizedBox(height: 12),
-            Text(
-              order['description'],
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
-            ),
+            _ExpandableDescription(description: order['description'], theme: theme, order: order),
             if (order['price'] != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -456,7 +453,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                 ],
               ),
             ],
-            if (status == 'accepted' || status == 'completed' || status == 'pending') ...[
+            if (status == 'accepted' || status == 'completed') ...[
               const SizedBox(height: 16),
               GradientButton(
                 text: isEmployer
@@ -924,6 +921,123 @@ class RatingInput extends StatelessWidget {
           onPressed: () => onChanged(index + 1),
         );
       }),
+    );
+  }
+}
+
+class _ExpandableDescription extends StatelessWidget {
+  final String description;
+  final ThemeData theme;
+  final Map<String, dynamic>? order;
+  const _ExpandableDescription({required this.description, required this.theme, this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          description,
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        GestureDetector(
+          onTap: () => _showDetailSheet(context),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              AppStrings.isRu ? 'Подробнее →' : 'Batafsil →',
+              style: TextStyle(color: theme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDetailSheet(BuildContext context) {
+    final o = order;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardTheme.color ?? Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: controller,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Text(
+                AppStrings.isRu ? 'Подробности заказа' : 'Buyurtma tafsilotlari',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.textTheme.titleLarge?.color),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppStrings.isRu ? 'Описание' : 'Tavsif',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.hintColor),
+              ),
+              const SizedBox(height: 6),
+              Text(description, style: TextStyle(fontSize: 15, height: 1.6, color: theme.textTheme.bodyLarge?.color)),
+              if (o != null) ...[
+                if (o['price'] != null) ...[
+                  const SizedBox(height: 16),
+                  _infoRow(Icons.payments_outlined, AppStrings.isRu ? 'Цена' : 'Narx', '${PriceFormatter.format(o['price'])} ${AppStrings.sum}'),
+                ],
+                if (o['city'] != null) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.location_on_outlined, AppStrings.isRu ? 'Локация' : 'Manzil', '${o['city']}${o['district'] != null ? ', ${o['district']}' : ''}'),
+                ],
+                if (o['include_lunch'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.restaurant_rounded, AppStrings.isRu ? 'Обед' : 'Tushlik', AppStrings.isRu ? 'Включён' : 'Kiritilgan'),
+                ],
+                if (o['include_taxi'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.local_taxi_rounded, AppStrings.isRu ? 'Проезд' : 'Yo\'l', AppStrings.isRu ? 'Оплачивается' : 'To\'lanadi'),
+                ],
+                if (o['is_company'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.groups_rounded, 'HR', AppStrings.isRu ? 'Набор персонала' : 'Xodimlar yollash'),
+                ],
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(AppStrings.isRu ? 'Закрыть' : 'Yopish', style: TextStyle(color: theme.primaryColor, fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.hintColor),
+        const SizedBox(width: 10),
+        Text('$label: ', style: TextStyle(color: theme.hintColor, fontSize: 13)),
+        Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: theme.textTheme.bodyLarge?.color))),
+      ],
     );
   }
 }

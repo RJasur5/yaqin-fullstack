@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
+import '../config/localization.dart';
 import '../models/user.dart';
 import '../models/category.dart';
 import '../models/master.dart';
 import '../models/order.dart';
 import '../models/subscription.dart';
+import 'connectivity_service.dart';
 
 class ApiService {
   String? _token;
@@ -18,6 +22,54 @@ class ApiService {
     if (_token != null) 'Authorization': 'Bearer $_token',
   };
 
+  /// Converts network errors to user-friendly messages
+  Never _handleNetworkError(dynamic e) {
+    if (ConnectivityService.isNetworkError(e)) {
+      throw (ConnectivityService.noInternetMessage);
+    }
+    throw e;
+  }
+
+  Future<http.Response> _safeGet(Uri url, {Map<String, String>? headers}) async {
+    try {
+      return await http.get(url, headers: headers ?? _headers).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _handleNetworkError(e);
+    }
+  }
+
+  Future<http.Response> _safePost(Uri url, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.post(url, headers: headers ?? _headers, body: body).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _handleNetworkError(e);
+    }
+  }
+
+  Future<http.Response> _safePut(Uri url, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.put(url, headers: headers ?? _headers, body: body).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _handleNetworkError(e);
+    }
+  }
+
+  Future<http.Response> _safePatch(Uri url, {Map<String, String>? headers, Object? body}) async {
+    try {
+      return await http.patch(url, headers: headers ?? _headers, body: body).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _handleNetworkError(e);
+    }
+  }
+
+  Future<http.Response> _safeDelete(Uri url, {Map<String, String>? headers}) async {
+    try {
+      return await http.delete(url, headers: headers ?? _headers).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      _handleNetworkError(e);
+    }
+  }
+
   // ==================== AUTH ====================
 
   Future<Map<String, dynamic>> register({
@@ -28,7 +80,7 @@ class ApiService {
     String? city,
     String lang = 'ru',
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.authRegister),
       headers: _headers,
       body: jsonEncode({
@@ -39,41 +91,41 @@ class ApiService {
         'city': city,
         'lang': lang,
       }),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Registration failed');
+    throw (jsonDecode(res.body)['detail'] ?? 'Registration failed');
   }
 
   Future<Map<String, dynamic>> login({
     required String phone,
     required String password,
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.authLogin),
       headers: _headers,
       body: jsonEncode({'phone': phone, 'password': password}),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Login failed');
+    throw (jsonDecode(res.body)['detail'] ?? 'Login failed');
   }
 
   Future<UserModel> getMe() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.authMe),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return UserModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Failed to get user');
+    throw ('Failed to get user');
   }
 
   Future<UserModel> updateProfile({String? name, String? city, String? lang}) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse(ApiConfig.authProfile),
       headers: _headers,
       body: jsonEncode({
@@ -81,7 +133,7 @@ class ApiService {
         if (city != null) 'city': city,
         if (lang != null) 'lang': lang,
       }),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return UserModel.fromJson(jsonDecode(res.body));
     }
@@ -89,21 +141,17 @@ class ApiService {
     try {
        msg = jsonDecode(res.body)['detail'];
     } catch (_) {}
-    throw Exception(msg);
+    throw (msg);
   }
 
-  Future<void> updateFCMToken(String token, {String? apnsToken}) async {
-    final body = {'fcm_token': token};
-    if (apnsToken != null) {
-      body['apns_token'] = apnsToken;
-    }
-    final res = await http.post(
+  Future<void> updateFCMToken(String token) async {
+    final res = await _safePost(
       Uri.parse(ApiConfig.authFcmToken),
       headers: _headers,
-      body: jsonEncode(body),
+      body: jsonEncode({'fcm_token': token}),
     ).timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {
-      throw Exception('Failed to update FCM token');
+      throw ('Failed to update FCM token');
     }
   }
 
@@ -124,21 +172,21 @@ class ApiService {
     try {
        msg = jsonDecode(response.body)['detail'];
     } catch (_) {}
-    throw Exception(msg);
+    throw (msg);
   }
 
   // ==================== CATEGORIES ====================
 
   Future<List<CategoryModel>> getCategories() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.categories),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       final list = jsonDecode(res.body) as List;
       return list.map((c) => CategoryModel.fromJson(c)).toList();
     }
-    throw Exception('Failed to load categories');
+    throw ('Failed to load categories');
   }
 
   // ==================== MASTERS ====================
@@ -164,36 +212,36 @@ class ApiService {
       'offset': '$offset',
     };
     final uri = Uri.parse(ApiConfig.masters).replace(queryParameters: params);
-    final res = await http.get(uri, headers: _headers).timeout(const Duration(seconds: 30));
+    final res = await _safeGet(uri, headers: _headers);
     if (res.statusCode == 200) {
       final list = jsonDecode(res.body) as List;
       return list.map((m) => MasterModel.fromJson(m)).toList();
     }
-    throw Exception('Failed to load masters');
+    throw ('Failed to load masters');
   }
 
   Future<MasterModel> getMasterDetail(int id) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.masterDetail(id)),
       headers: _headers,
     );
     if (res.statusCode == 200) {
       return MasterModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Master not found');
+    throw ('Master not found');
   }
 
   Future<MasterModel?> getMyMasterProfile() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/masters/profile/me'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return MasterModel.fromJson(jsonDecode(res.body));
     } else if (res.statusCode == 404) {
       return null;
     }
-    throw Exception('Failed to get my master profile');
+    throw ('Failed to get my master profile');
   }
 
   Future<MasterModel> createMasterProfile({
@@ -206,7 +254,7 @@ class ApiService {
     String? address,
     List<String>? skills,
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.masterProfile),
       headers: _headers,
       body: jsonEncode({
@@ -223,7 +271,7 @@ class ApiService {
     if (res.statusCode == 200) {
       return MasterModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to create profile');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to create profile');
   }
 
   Future<MasterModel> updateMasterProfile({
@@ -246,7 +294,7 @@ class ApiService {
     if (address != null) body['address'] = address;
     if (skills != null) body['skills'] = skills;
 
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse(ApiConfig.masterProfile),
       headers: _headers,
       body: jsonEncode(body),
@@ -254,35 +302,35 @@ class ApiService {
     if (res.statusCode == 200) {
       return MasterModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to update profile');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to update profile');
   }
 
   Future<void> createReview(int masterId, int rating, String? comment) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.masterReview(masterId)),
       headers: _headers,
       body: jsonEncode({'rating': rating, 'comment': comment}),
     );
     if (res.statusCode != 200) {
-      throw Exception('Failed to create review');
+      throw ('Failed to create review');
     }
   }
 
   Future<void> rateMasterByOrder(int orderId, int rating, String? comment) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/rate_master'),
       headers: _headers,
       body: jsonEncode({'rating': rating, 'comment': comment}),
     );
     if (res.statusCode != 200) {
-      throw Exception('Failed to rate master');
+      throw ('Failed to rate master');
     }
   }
 
   // ==================== FAVORITES ====================
 
   Future<List<MasterModel>> getFavorites() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.favorites),
       headers: _headers,
     );
@@ -290,16 +338,16 @@ class ApiService {
       final list = jsonDecode(res.body) as List;
       return list.map((m) => MasterModel.fromJson(m)).toList();
     }
-    throw Exception('Failed to load favorites');
+    throw ('Failed to load favorites');
   }
 
   Future<void> toggleFavorite(int masterId) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.toggleFavorite(masterId)),
       headers: _headers,
     );
     if (res.statusCode != 200) {
-      throw Exception('Failed to toggle favorite');
+      throw ('Failed to toggle favorite');
     }
   }
 
@@ -314,8 +362,11 @@ class ApiService {
     bool includeLunch = false,
     bool includeTaxi = false,
     bool isCompany = false,
+    String? landmark,
+    double? lat,
+    double? lon,
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.orders),
       headers: _headers,
       body: jsonEncode({
@@ -327,12 +378,15 @@ class ApiService {
         'include_lunch': includeLunch,
         'include_taxi': includeTaxi,
         'is_company': isCompany,
+        'landmark': landmark,
+        'lat': lat,
+        'lon': lon,
       }),
     );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to create order');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to create order');
   }
 
   Future<List<dynamic>> getAvailableOrders({
@@ -348,11 +402,11 @@ class ApiService {
       if (search != null && search.isNotEmpty) 'search': search,
     };
     final uri = Uri.parse(ApiConfig.ordersAvailable).replace(queryParameters: params);
-    final res = await http.get(uri, headers: _headers);
+    final res = await _safeGet(uri, headers: _headers);
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List;
     }
-    throw Exception('Failed to load available orders');
+    throw ('Failed to load available orders');
   }
 
 
@@ -361,62 +415,62 @@ class ApiService {
       if (type != null) 'type': type,
     };
     final uri = Uri.parse(ApiConfig.ordersMy).replace(queryParameters: params);
-    final res = await http.get(uri, headers: _headers);
+    final res = await _safeGet(uri, headers: _headers);
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List;
     }
-    throw Exception('Failed to load my orders');
+    throw ('Failed to load my orders');
   }
 
   Future<Map<String, dynamic>> acceptOrder(int orderId) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.acceptOrder(orderId)),
       headers: _headers,
     );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to accept order');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to accept order');
   }
 
   Future<void> hrAcceptMaster(int orderId) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/hr-accept'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to accept master');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to accept master');
     }
   }
 
   // ==================== CLIENTS ====================
 
   Future<void> rateClient(int orderId, int rating, String? comment) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.rateClient(orderId)),
       headers: _headers,
       body: jsonEncode({'rating': rating, 'comment': comment}),
     );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to rate client');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to rate client');
     }
   }
 
   Future<Map<String, dynamic>> getClientProfile(int clientId) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.clientProfile(clientId)),
       headers: _headers,
     );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception('Failed to load client profile');
+    throw ('Failed to load client profile');
   }
 
   // ==================== CHAT ====================
 
   Future<List<dynamic>> getChatHistory(int orderId) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.orderChat(orderId)),
       headers: _headers,
     );
@@ -428,11 +482,11 @@ class ApiService {
       final decoded = jsonDecode(res.body);
       msg = decoded['detail'] ?? msg;
     } catch (_) {}
-    throw Exception('$msg (${res.statusCode})');
+    throw ('$msg (${res.statusCode})');
   }
 
   Future<Map<String, dynamic>> sendChatMessage(int orderId, String text) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.orderChat(orderId)),
       headers: _headers,
       body: jsonEncode({'text': text}),
@@ -440,11 +494,11 @@ class ApiService {
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception('Failed to send message');
+    throw ('Failed to send message');
   }
 
   Future<List<dynamic>> getChatList() async {
-    final response = await http.get(
+    final response = await _safeGet(
       Uri.parse(ApiConfig.orderChatList),
       headers: _headers,
     );
@@ -456,118 +510,118 @@ class ApiService {
       final decoded = json.decode(utf8.decode(response.bodyBytes));
       msg = decoded['detail'] ?? msg;
     } catch (_) {}
-    throw Exception('$msg (${response.statusCode})');
+    throw ('$msg (${response.statusCode})');
   }
 
   Future<void> markAsRead(int orderId) async {
-    final response = await http.post(
+    final response = await _safePost(
       Uri.parse('${ApiConfig.apiUrl}/orders/$orderId/read'),
       headers: _headers,
     );
     if (response.statusCode != 200) {
-      throw Exception('Failed to mark messages as read');
+      throw ('Failed to mark messages as read');
     }
   }
 
   // ==================== ADMIN ====================
 
   Future<List<UserModel>> getAdminUsers() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.adminUsers),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       return data.map((u) => UserModel.fromJson(u)).toList();
     }
-    throw Exception('Failed to load users');
+    throw ('Failed to load users');
   }
 
   Future<UserModel> getAdminUserDetail(int id) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.adminUserDetail(id)),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return UserModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception('Failed to load user details');
+    throw ('Failed to load user details');
   }
 
   Future<void> deleteUser(int id) async {
-    final res = await http.delete(
+    final res = await _safeDelete(
       Uri.parse(ApiConfig.adminUserDetail(id)),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to delete user');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to delete user');
     }
   }
 
   Future<void> updateUserAdmin(int id, Map<String, dynamic> data) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse(ApiConfig.adminUserDetail(id)),
       headers: _headers,
       body: jsonEncode(data),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to update user');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to update user');
     }
   }
 
   Future<void> updateMasterProfileAdmin(int id, Map<String, dynamic> data) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.adminUserDetail(id)}/master'),
       headers: _headers,
       body: jsonEncode(data),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to update master profile');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to update master profile');
     }
   }
 
   Future<List<OrderResponse>> getAdminOrders() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.adminOrders),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       final List data = jsonDecode(res.body);
       return data.map((o) => OrderResponse.fromJson(o)).toList();
     }
-    throw Exception('Failed to load orders');
+    throw ('Failed to load orders');
   }
 
   Future<void> deleteOrder(int id) async {
-    final res = await http.delete(
+    final res = await _safeDelete(
       Uri.parse(ApiConfig.adminOrderDetail(id)),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to delete order');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to delete order');
     }
   }
 
   Future<List<dynamic>> getAppReviews() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.appReviews),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get reviews');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to get reviews');
     }
     return jsonDecode(res.body);
   }
 
   Future<void> createAppReview(int rating, String comment) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse(ApiConfig.appReviews),
       headers: _headers,
       body: jsonEncode({
         'rating': rating,
         'comment': comment,
       }),
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode != 200 && res.statusCode != 201) {
       String errorMessage = 'Failed to leave review';
@@ -582,16 +636,16 @@ class ApiService {
           }
         } catch (_) {}
       }
-      throw Exception(errorMessage);
+      throw (errorMessage);
     }
   }
 
   Future<void> adminChangeUserPassword(int userId, String newPassword) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.baseUrl}/api/auth/admin/users/$userId/password'),
       headers: _headers,
       body: jsonEncode(newPassword), // The endpoint expects a plain string or we can wrap it
-    ).timeout(const Duration(seconds: 30));
+    );
     
     // Note: If the backend expects a JSON object {"new_password": "..."}, we should change this.
     // Based on my previous backend edit, I used: def admin_change_user_password(user_id: int, new_password: str, ...)
@@ -600,39 +654,39 @@ class ApiService {
     // In FastAPI, a simple type in a POST/PUT without Body() is a Query param.
     
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to change password');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to change password');
     }
   }
 
   Future<Map<String, dynamic>> getAdminStats() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse(ApiConfig.adminStats),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception('Failed to load admin stats');
+    throw ('Failed to load admin stats');
   }
 
   // ==================== SUBSCRIPTIONS ====================
 
   Future<SubscriptionModel> getMySubscription({String role = 'master'}) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/my-status?role=$role'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return SubscriptionModel.fromJson(jsonDecode(res.body));
     }
     // Handle non-JSON responses (e.g. nginx 502 HTML pages)
     try {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get subscription');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to get subscription');
     } catch (e) {
       if (e is FormatException) {
-        throw Exception('Server unavailable (${res.statusCode})');
+        throw ('Server unavailable (${res.statusCode})');
       }
       rethrow;
     }
@@ -644,7 +698,7 @@ class ApiService {
     required String cvv,
     required String planName,
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/pay-card'),
       headers: _headers,
       body: jsonEncode({
@@ -653,48 +707,48 @@ class ApiService {
         'cvv': cvv,
         'plan_name': planName,
       }),
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return SubscriptionModel.fromJson(jsonDecode(res.body));
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Payment failed');
+    throw (jsonDecode(res.body)['detail'] ?? 'Payment failed');
   }
 
   Future<String> getClickUrl(String planName, {String role = 'master'}) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/click-url?plan_name=$planName&role=$role'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return jsonDecode(res.body)['url'];
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get payment URL');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to get payment URL');
   }
 
   Future<String> getPaymeUrl(String planName, {String role = 'master'}) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/payme-url?plan_name=$planName&role=$role'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return jsonDecode(res.body)['url'];
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get Payme URL');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to get Payme URL');
   }
 
   Future<String> getPaynetUrl(String planName, {String role = 'master'}) async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/subscriptions/paynet-url?plan_name=$planName&role=$role'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     
     if (res.statusCode == 200) {
       return jsonDecode(res.body)['url'];
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to get Paynet URL');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to get Paynet URL');
   }
 
   // ==================== JOB APPLICATIONS ====================
@@ -704,7 +758,7 @@ class ApiService {
     String? city,
     String? phone,
   }) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$masterId'),
       headers: _headers,
       body: jsonEncode({
@@ -712,63 +766,63 @@ class ApiService {
         if (city != null) 'city': city,
         if (phone != null) 'phone': phone,
       }),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body);
     }
-    throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to create application');
+    throw (jsonDecode(res.body)['detail'] ?? 'Failed to create application');
   }
 
   Future<List<dynamic>> getMyReceivedApplications() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/job-applications/my/received'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List;
     }
-    throw Exception('Failed to load applications');
+    throw ('Failed to load applications');
   }
 
   Future<List<dynamic>> getMySentApplications() async {
-    final res = await http.get(
+    final res = await _safeGet(
       Uri.parse('${ApiConfig.baseUrl}/api/job-applications/my/sent'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode == 200) {
       return jsonDecode(res.body) as List;
     }
-    throw Exception('Failed to load applications');
+    throw ('Failed to load applications');
   }
 
   Future<void> updateApplicationStatus(int applicationId, String status) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$applicationId/status'),
       headers: _headers,
       body: jsonEncode({'status': status}),
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to update status');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to update status');
     }
   }
 
   Future<void> withdrawJobApplication(int applicationId) async {
-    final res = await http.delete(
+    final res = await _safeDelete(
       Uri.parse('${ApiConfig.baseUrl}/api/job-applications/$applicationId'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to withdraw application');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to withdraw application');
     }
   }
 
   Future<void> cancelOrder(int orderId) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/cancel'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to cancel order');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to cancel order');
     }
   }
 
@@ -777,34 +831,34 @@ class ApiService {
     if (keepMasterId != null) {
       url += '?keep_master_id=$keepMasterId';
     }
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse(url),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to cancel others');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to cancel others');
     }
   }
 
   Future<void> rejectMaster(int orderId) async {
-    final res = await http.put(
+    final res = await _safePut(
       Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/reject'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to reject master');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to reject master');
     }
   }
 
   /// Extends an active HR announcement by 5 more minutes.
   /// Called when HR employer taps "Yes" in the expiry warning dialog.
   Future<void> extendHrAnnouncement(int orderId) async {
-    final res = await http.post(
+    final res = await _safePost(
       Uri.parse('${ApiConfig.baseUrl}/api/orders/$orderId/extend-hr'),
       headers: _headers,
-    ).timeout(const Duration(seconds: 30));
+    );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['detail'] ?? 'Failed to extend HR announcement');
+      throw (jsonDecode(res.body)['detail'] ?? 'Failed to extend HR announcement');
     }
   }
 }

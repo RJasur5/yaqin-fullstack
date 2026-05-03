@@ -9,11 +9,13 @@ import 'package:intl/intl.dart';
 class ClientProfileScreen extends StatefulWidget {
   final int clientId;
   final ApiService apiService;
+  final bool hidePhone;
 
   const ClientProfileScreen({
     super.key,
     required this.clientId,
     required this.apiService,
+    this.hidePhone = false,
   });
 
   @override
@@ -150,7 +152,7 @@ class _ClientProfileScreenState extends State<ClientProfileScreen> {
           
           // Details
           _buildInfoRow(Icons.calendar_today_rounded, 'На Yaqin с', joinDate, theme),
-          if (_client!['phone'] != null)
+          if (_client!['phone'] != null && !widget.hidePhone)
             _buildInfoRow(Icons.phone_rounded, 'Телефон', _client!['phone'], theme),
 
           const SizedBox(height: 32),

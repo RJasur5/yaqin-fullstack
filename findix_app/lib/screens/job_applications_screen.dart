@@ -97,6 +97,7 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
       decoration: BoxDecoration(gradient: palette.bgGradient),
       child: Scaffold(
         backgroundColor: Colors.transparent,
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(AppStrings.jobApplications),
           backgroundColor: Colors.transparent,
@@ -110,7 +111,7 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
                     onRefresh: _loadApplications,
                     color: theme.primaryColor,
                     child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.only(top: 100, left: 16, right: 16, bottom: 40),
                       itemCount: _applications.length,
                       itemBuilder: (context, index) => _buildApplicationCard(_applications[index], theme),
                     ),
@@ -234,10 +235,10 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
                     children: [
                       Text(
                         app['employer_name'] ?? '',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
                       ),
                       if (dateStr.isNotEmpty)
-                        Text(dateStr, style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
+                        Text(dateStr, style: TextStyle(color: Colors.white70, fontSize: 11)),
                     ],
                   ),
                 ),
@@ -271,14 +272,11 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
           // Description
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text(
-              app['description'] ?? '',
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
-            ),
+            child: _ExpandableDescription(description: app['description'] ?? '', theme: theme),
           ),
 
-          // Contact info
-          if (app['phone'] != null && (app['phone'] as String).isNotEmpty)
+          // Contact info — only show when accepted
+          if (status == 'accepted' && app['phone'] != null && (app['phone'] as String).isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Row(
@@ -370,6 +368,54 @@ class _JobApplicationsScreenState extends State<JobApplicationsScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ExpandableDescription extends StatelessWidget {
+  final String description;
+  final ThemeData theme;
+  const _ExpandableDescription({required this.description, required this.theme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          description,
+          style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (description.length > 100)
+          GestureDetector(
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: Text(AppStrings.isRu ? 'Описание' : 'Tavsif'),
+                  content: SingleChildScrollView(
+                    child: Text(description, style: const TextStyle(fontSize: 15, height: 1.5)),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: Text(AppStrings.isRu ? 'Закрыть' : 'Yopish'),
+                    ),
+                  ],
+                ),
+              );
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                AppStrings.isRu ? 'Подробнее →' : 'Batafsil →',
+                style: TextStyle(color: theme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

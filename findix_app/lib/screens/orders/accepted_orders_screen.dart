@@ -9,6 +9,7 @@ import '../../widgets/rating_stars.dart';
 import '../../utils/date_utils.dart';
 import '../../utils/formatters.dart';
 import 'chat_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AcceptedOrdersScreen extends StatefulWidget {
   final ApiService apiService;
@@ -180,10 +181,55 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
               style: const TextStyle(color: AppColors.textHint, fontSize: 12),
             ),
             const SizedBox(height: 12),
-            Text(
-              order['description'],
-              style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
-            ),
+            _ExpandableDescription(description: order['description'], theme: theme, order: order),
+            // Map link
+            if (order['city'] != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.location_on_rounded, color: theme.textTheme.bodyMedium?.color, size: 14),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      '${order['city']}${order['district'] != null ? ', ${order['district']}' : ''}',
+                      style: TextStyle(color: theme.textTheme.bodyMedium?.color, fontSize: 13),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      String query;
+                      if (order['lat'] != null && order['lon'] != null) {
+                        query = '${order['lat']},${order['lon']}';
+                      } else {
+                        query = '${order['city']} ${order['district'] ?? ''}'.trim();
+                      }
+                      final url = 'https://www.google.com/maps/search/?api=1&query=$query';
+                      try {
+                        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                      } catch (e) {
+                        debugPrint('Could not launch map: $e');
+                      }
+                    },
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.map_rounded, size: 14, color: Colors.blue),
+                        const SizedBox(width: 4),
+                        Text(
+                          AppStrings.isRu ? 'На карте' : 'Xaritada',
+                          style: const TextStyle(
+                            color: Colors.blue,
+                            fontSize: 13,
+                            decoration: TextDecoration.underline,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (order['price'] != null) ...[
               const SizedBox(height: 12),
               Text(
@@ -211,22 +257,6 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
             ),
             if (status == 'accepted' || status == 'completed') ...[
               const SizedBox(height: 16),
-              GradientButton(
-                text: AppStrings.isRu ? 'Чат с клиентом' : 'Mijoz bilan chat',
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        order: order,
-                        apiService: widget.apiService,
-                        currentUserId: widget.authService.currentUser?.id ?? 0,
-                      ),
-                    ),
-                  );
-                },
-              ),
-              const SizedBox(height: 12),
               if (order['is_client_reviewed'] == true)
                 Container(
                   width: double.infinity,
@@ -243,11 +273,30 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
                     ),
                   ),
                 )
-              else
+              else ...[
                 GradientButton(
-                  text: AppStrings.isRu ? 'Оценить клиента' : 'Mijozni baholash',
-                  onPressed: () => _showRateClientDialog(order),
+                  text: AppStrings.isRu ? 'Чат с клиентом' : 'Mijoz bilan chat',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          order: order,
+                          apiService: widget.apiService,
+                          currentUserId: widget.authService.currentUser?.id ?? 0,
+                        ),
+                      ),
+                    );
+                  },
                 ),
+                if (status == 'completed') ...[
+                  const SizedBox(height: 12),
+                  GradientButton(
+                    text: AppStrings.isRu ? 'Оценить клиента' : 'Mijozni baholash',
+                    onPressed: () => _showRateClientDialog(order),
+                  ),
+                ],
+              ],
             ],
           ],
         ),
@@ -321,6 +370,128 @@ class _AcceptedOrdersScreenState extends State<AcceptedOrdersScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ExpandableDescription extends StatelessWidget {
+  final String description;
+  final ThemeData theme;
+  final Map<String, dynamic>? order;
+  const _ExpandableDescription({required this.description, required this.theme, this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          description,
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 15),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        ),
+        GestureDetector(
+          onTap: () => _showDetailSheet(context),
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              AppStrings.isRu ? 'Подробнее →' : 'Batafsil →',
+              style: TextStyle(color: theme.primaryColor, fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showDetailSheet(BuildContext context) {
+    final o = order;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardTheme.color ?? Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (_, controller) => Padding(
+          padding: const EdgeInsets.all(20),
+          child: ListView(
+            controller: controller,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.grey[400], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              Text(
+                AppStrings.isRu ? 'Подробности заказа' : 'Buyurtma tafsilotlari',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: theme.textTheme.titleLarge?.color),
+              ),
+              const SizedBox(height: 16),
+              // Description
+              Text(
+                AppStrings.isRu ? 'Описание' : 'Tavsif',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.hintColor),
+              ),
+              const SizedBox(height: 6),
+              Text(description, style: TextStyle(fontSize: 15, height: 1.6, color: theme.textTheme.bodyLarge?.color)),
+              if (o != null) ...[
+                if (o['price'] != null) ...[
+                  const SizedBox(height: 16),
+                  _infoRow(Icons.payments_outlined, AppStrings.isRu ? 'Цена' : 'Narx', '${PriceFormatter.format(o['price'])} ${AppStrings.sum}'),
+                ],
+                if (o['city'] != null) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.location_on_outlined, AppStrings.isRu ? 'Локация' : 'Manzil', '${o['city']}${o['district'] != null ? ', ${o['district']}' : ''}'),
+                ],
+                if (o['include_lunch'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.restaurant_rounded, AppStrings.isRu ? 'Обед' : 'Tushlik', AppStrings.isRu ? 'Включён' : 'Kiritilgan'),
+                ],
+                if (o['include_taxi'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.local_taxi_rounded, AppStrings.isRu ? 'Проезд' : 'Yo\'l', AppStrings.isRu ? 'Оплачивается' : 'To\'lanadi'),
+                ],
+                if (o['is_company'] == true) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.groups_rounded, 'HR', AppStrings.isRu ? 'Набор персонала' : 'Xodimlar yollash'),
+                ],
+                if (o['client_name'] != null) ...[
+                  const SizedBox(height: 12),
+                  _infoRow(Icons.person_outline, AppStrings.isRu ? 'Клиент' : 'Mijoz', o['client_name']),
+                ],
+              ],
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(AppStrings.isRu ? 'Закрыть' : 'Yopish', style: TextStyle(color: theme.primaryColor, fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.hintColor),
+        const SizedBox(width: 10),
+        Text('$label: ', style: TextStyle(color: theme.hintColor, fontSize: 13)),
+        Expanded(child: Text(value, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: theme.textTheme.bodyLarge?.color))),
+      ],
     );
   }
 }

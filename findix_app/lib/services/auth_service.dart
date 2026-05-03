@@ -101,6 +101,13 @@ class AuthService {
   Future<void> saveLang(String lang) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_langKey, lang);
+    if (token != null) {
+      try {
+        currentUser = await api.updateProfile(lang: lang);
+      } catch (e) {
+        debugPrint('Failed to sync language to backend: $e');
+      }
+    }
   }
 
   Future<UserModel> uploadAvatar(String imagePath) async {

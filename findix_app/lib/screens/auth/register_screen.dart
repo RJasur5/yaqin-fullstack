@@ -31,6 +31,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
     'Nukus', 'Navoiy', 'Urganch', 'Qarshi', 'Jizzax', 'Termiz', 'Xiva', 'Guliston'
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_protectPrefix);
+  }
+
+  void _protectPrefix() {
+    const prefix = '+998 ';
+    if (!_phoneController.text.startsWith(prefix)) {
+      _phoneController.removeListener(_protectPrefix);
+      _phoneController.text = prefix;
+      _phoneController.selection = TextSelection.fromPosition(
+        TextPosition(offset: prefix.length),
+      );
+      _phoneController.addListener(_protectPrefix);
+    }
+  }
+
   Future<void> _register() async {
     if (!_acceptedPolicy) {
       setState(() => _error = AppStrings.isRu ? 'Необходимо согласиться с политикой конфиденциальности' : 'Maxfiylik siyosatiga rozi bo\'lishingiz kerak');
@@ -38,9 +56,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     if (_phoneController.text.isEmpty ||
         _passwordController.text.isEmpty) {
-      setState(() => _error = 'Введите номер телефона и пароль');
+      setState(() => _error = AppStrings.isRu ? 'Введите номер телефона и пароль' : 'Telefon raqami va parolni kiriting');
       return;
     }
+    
+    // Name validation
+    if (_nameController.text.trim().isEmpty || _nameController.text.trim().length < 10) {
+      setState(() => _error = AppStrings.isRu 
+          ? 'Имя должно содержать не менее 10 символов' 
+          : 'Ism kamida 10 ta belgidan iborat bo\'lishi kerak');
+      return;
+    }
+
+    // Password validation
+    if (_passwordController.text.length < 6) {
+      setState(() => _error = AppStrings.isRu 
+          ? 'Пароль должен содержать не менее 6 символов' 
+          : 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak');
+      return;
+    }
+
     // Phone digit count check: must have exactly 9 digits after 998
     final digits = _phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
     // digits starts with '998' (3 digits) + 9 subscriber digits = 12 total

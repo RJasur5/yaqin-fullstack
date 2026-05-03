@@ -22,9 +22,33 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   String? _error;
 
+  @override
+  void initState() {
+    super.initState();
+    _phoneController.addListener(_protectPrefix);
+  }
+
+  void _protectPrefix() {
+    const prefix = '+998 ';
+    if (!_phoneController.text.startsWith(prefix)) {
+      _phoneController.removeListener(_protectPrefix);
+      _phoneController.text = prefix;
+      _phoneController.selection = TextSelection.fromPosition(
+        TextPosition(offset: prefix.length),
+      );
+      _phoneController.addListener(_protectPrefix);
+    }
+  }
+
   Future<void> _login() async {
     if (_phoneController.text.isEmpty || _passwordController.text.isEmpty) {
-      setState(() => _error = 'Заполните все поля');
+      setState(() => _error = AppStrings.isRu ? 'Заполните все поля' : 'Barcha maydonlarni to\'ldiring');
+      return;
+    }
+    if (_passwordController.text.length < 6) {
+      setState(() => _error = AppStrings.isRu 
+          ? 'Пароль должен содержать не менее 6 символов' 
+          : 'Parol kamida 6 ta belgidan iborat bo\'lishi kerak');
       return;
     }
     // Phone digit count check: must have exactly 9 digits after 998

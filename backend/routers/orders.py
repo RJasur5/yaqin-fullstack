@@ -267,6 +267,8 @@ def build_order_response(order: Order, is_subscribed: bool = True, override_mast
         description=order.description,
         city=order.city,
         district=order.district,
+        lat=order.lat,
+        lon=order.lon,
         price=order.price,
         status=order.status,
         created_at=created_at,
@@ -333,6 +335,9 @@ async def create_order(
         raise HTTPException(status_code=403, detail="Ваш профиль заблокирован")
     # Note: Employers no longer need a subscription to post ads (free for employers)
     # Only masters need subscriptions (to accept orders)
+    
+    print(f"DEBUG create_order: data.lat={data.lat}, data.lon={data.lon}, city={data.city}, district={data.district}")
+    print(f"DEBUG create_order: full data = {data.model_dump()}")
         
     order = Order(
         client_id=user.id,
@@ -340,6 +345,8 @@ async def create_order(
         description=data.description,
         city=data.city,
         district=data.district,
+        lat=data.lat,
+        lon=data.lon,
         price=data.price,
         include_lunch=data.include_lunch,
         include_taxi=data.include_taxi,
@@ -488,7 +495,13 @@ async def accept_order(
     user = get_current_user_from_header(authorization, db)
     profile = db.query(MasterProfile).filter(MasterProfile.user_id == user.id).first()
     if not profile:
-        raise HTTPException(status_code=403, detail="Only masters can accept orders")
+        lang = getattr(user, 'lang', 'ru')
+        msg = (
+            "Только мастера могут принимать заказы. Пожалуйста, заполните профиль мастера в профиле." 
+            if lang == 'ru' 
+            else "Faqat ustalar buyurtmalarni qabul qilishi mumkin. Iltimos, profilda usta profilini to'ldiring."
+        )
+        raise HTTPException(status_code=403, detail=msg)
 
     order = db.query(Order).options(
         joinedload(Order.assignments)
@@ -898,7 +911,7 @@ async def get_chat_list(
     # We now include 'cancelled' and 'rejected' so users can see the final status/history
     orders = db.query(Order).outerjoin(MasterProfile, Order.master_id == MasterProfile.id).filter(
         ((Order.client_id == current_user.id) | (MasterProfile.user_id == current_user.id)) &
-        (Order.status.in_(["accepted", "accepted_hr", "completed", "cancelled", "rejected", "vacancy_closed", "pending"]))
+        (Order.status.in_(["accepted", "accepted_hr", "completed", "cancelled", "rejected", "vacancy_closed"]))
     ).all()
     
     print(f"DEBUG: Found {len(orders)} relevant orders for chat list")
